@@ -1,61 +1,225 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# ServerBond Panel
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+**ServerBond Agent** için geliştirilmiş, modern ve kullanıcı dostu web tabanlı sunucu yönetim paneli.
 
-## About Laravel
+## 🚀 Özellikler
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+### Multi-Site Yönetimi
+- ✅ **Çoklu Site Desteği**: Laravel, PHP, Static HTML, Node.js ve Python uygulamaları
+- ✅ **Otomatik Nginx Konfigürasyonu**: Her site tipi için optimize edilmiş yapılandırma
+- ✅ **Git Entegrasyonu**: Otomatik deployment ve branch yönetimi
+- ✅ **SSL/TLS Yönetimi**: Let's Encrypt ve özel sertifika desteği
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+### Deployment & CI/CD
+- ✅ **Tek Tıkla Deployment**: Manuel, otomatik ve webhook tetikleyicileri
+- ✅ **Deployment Geçmişi**: Tüm deployment'ların detaylı takibi
+- ✅ **Commit Bilgileri**: Her deployment için commit hash, mesaj ve yazar
+- ✅ **Gerçek Zamanlı Loglar**: Deployment sürecinin anlık takibi
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+### Database Yönetimi
+- ✅ **Otomatik MySQL Database**: Her site için ayrı database oluşturma
+- ✅ **Kullanıcı & Yetki Yönetimi**: Güvenli database kullanıcıları
+- ✅ **Database Metrikleri**: Boyut ve kullanım istatistikleri
 
-## Learning Laravel
+### Sistem Monitoring
+- ✅ **Gerçek Zamanlı Metrikler**: CPU, RAM ve Disk kullanımı
+- ✅ **Sunucu Bilgileri**: OS versiyonu, uptime, load average
+- ✅ **Site İstatistikleri**: Aktif/inaktif site sayıları
+- ✅ **Deployment Başarı Oranı**: Performans takibi
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+### Environment Yönetimi
+- ✅ **`.env` Dosya Düzenleyici**: Her site için ayrı environment değişkenleri
+- ✅ **Güvenli Saklama**: Secret değişkenler için şifrelenmiş depolama
+- ✅ **Toplu Düzenleme**: Kolay yönetim arayüzü
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+## 📋 Gereksinimler
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+- **Ubuntu 24.04 LTS** (ServerBond Agent ile kurulmuş)
+- **PHP 8.2+**
+- **Composer**
+- **Node.js & NPM**
+- **MySQL 8.0**
+- **Nginx**
 
-## Laravel Sponsors
+## ⚡ Kurulum
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+### 1. ServerBond Agent Kurulumu
 
-### Premium Partners
+Öncelikle sunucunuza [ServerBond Agent](https://github.com/beyazitkolemen/serverbond-agent) kurulumunu yapın:
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+\`\`\`bash
+curl -fsSL https://raw.githubusercontent.com/beyazitkolemen/serverbond-agent/main/install.sh | sudo bash
+\`\`\`
 
-## Contributing
+### 2. Panel Kurulumu
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+\`\`\`bash
+# Projeyi klonlayın
+git clone https://github.com/beyazitkolemen/serverbond-panel.git
+cd serverbond-panel
 
-## Code of Conduct
+# Bağımlılıkları yükleyin
+composer install
+npm install
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+# Environment dosyasını oluşturun
+cp .env.example .env
+php artisan key:generate
 
-## Security Vulnerabilities
+# Database oluşturun
+php artisan migrate --seed
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+# Asset'leri derleyin
+npm run build
 
-## License
+# Admin kullanıcısı oluşturun (seeder ile otomatik)
+# Email: admin@serverbond.local
+# Password: password
+\`\`\`
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+### 3. Nginx Konfigürasyonu
+
+\`\`\`nginx
+server {
+    listen 80;
+    server_name panel.yourdomain.com;
+    root /var/www/serverbond-panel/public;
+
+    add_header X-Frame-Options "SAMEORIGIN";
+    add_header X-Content-Type-Options "nosniff";
+
+    index index.php;
+
+    charset utf-8;
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location = /favicon.ico { access_log off; log_not_found off; }
+    location = /robots.txt  { access_log off; log_not_found off; }
+
+    error_page 404 /index.php;
+
+    location ~ \\.php$ {
+        fastcgi_pass unix:/var/run/php/php8.4-fpm.sock;
+        fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+        include fastcgi_params;
+    }
+
+    location ~ /\\.(?!well-known).* {
+        deny all;
+    }
+}
+\`\`\`
+
+### 4. İzinleri Ayarlayın
+
+\`\`\`bash
+sudo chown -R www-data:www-data /var/www/serverbond-panel
+sudo chmod -R 755 /var/www/serverbond-panel
+sudo chmod -R 775 /var/www/serverbond-panel/storage
+sudo chmod -R 775 /var/www/serverbond-panel/bootstrap/cache
+\`\`\`
+
+## 🎯 Kullanım
+
+### İlk Giriş
+
+Tarayıcınızda panel adresinize gidin ve aşağıdaki bilgilerle giriş yapın:
+
+- **Email**: `admin@serverbond.local`
+- **Şifre**: `password`
+
+> ⚠️ İlk girişten sonra şifrenizi mutlaka değiştirin!
+
+### Yeni Site Ekleme
+
+1. **Sites** menüsünden **Create** butonuna tıklayın
+2. Site bilgilerini doldurun:
+   - **Name**: Site adı
+   - **Domain**: Alan adı (örn: example.com)
+   - **Type**: Site tipi (Laravel, PHP, Static, Node.js, Python)
+   - **Git Repository**: Repository URL'i
+   - **Git Branch**: Branch adı (main, master, develop vs.)
+3. **Save** butonuna tıklayın
+4. Site oluşturulduktan sonra **Deploy** butonuyla ilk deployment'ı yapın
+
+### Deployment
+
+#### Manuel Deployment
+1. Site detay sayfasında **Deploy** butonuna tıklayın
+2. Deployment sürecini loglardan takip edin
+
+#### Otomatik Deployment
+1. Site düzenleme sayfasında **Auto Deploy** seçeneğini aktifleştirin
+2. Her git push'ta otomatik deployment yapılır
+
+#### Webhook Deployment
+1. Site için webhook token'ı oluşturun
+2. Git repository'nizde webhook ayarlayın
+3. Her push'ta otomatik deployment tetiklenir
+
+### SSL Sertifikası Ekleme
+
+1. Site detay sayfasında **SSL Certificate** sekmesine gidin
+2. **Let's Encrypt** veya **Custom Certificate** seçin
+3. Gerekli bilgileri doldurun ve kaydedin
+
+## 🛠️ Teknoloji Stack
+
+- **Laravel 12** - PHP Framework
+- **Filament v4** - Admin Panel
+- **Livewire 3** - Reactive Components  
+- **Alpine.js** - JavaScript Framework
+- **Tailwind CSS** - CSS Framework
+- **MySQL 8** - Database
+- **Redis** - Cache & Sessions
+
+## 📊 Dashboard Widgets
+
+### Server Stats Widget
+- CPU kullanımı (%)
+- RAM kullanımı (GB)
+- Disk kullanımı (GB)
+- Sistem bilgileri
+
+### Sites Stats Widget
+- Toplam site sayısı
+- Aktif/İnaktif site sayıları
+- Deployment istatistikleri
+- Başarı oranı
+
+## 🔒 Güvenlik
+
+- ✅ Laravel Sanctum Authentication
+- ✅ CSRF Protection
+- ✅ XSS Protection
+- ✅ SQL Injection Protection
+- ✅ Şifrelenmiş hassas veriler (database passwords, API keys)
+- ✅ Rate Limiting
+
+## 🤝 Katkıda Bulunma
+
+1. Fork yapın
+2. Feature branch oluşturun (`git checkout -b feature/amazing-feature`)
+3. Commit yapın (`git commit -m 'feat: Add amazing feature'`)
+4. Push yapın (`git push origin feature/amazing-feature`)
+5. Pull Request açın
+
+## 📝 Lisans
+
+MIT License - Detaylar için [LICENSE](LICENSE) dosyasına bakın.
+
+## 📧 İletişim
+
+- **GitHub**: [github.com/beyazitkolemen/serverbond-panel](https://github.com/beyazitkolemen/serverbond-panel)
+- **Issues**: [github.com/beyazitkolemen/serverbond-panel/issues](https://github.com/beyazitkolemen/serverbond-panel/issues)
+
+## 🙏 Teşekkürler
+
+Bu proje [ServerBond Agent](https://github.com/beyazitkolemen/serverbond-agent) ile birlikte çalışacak şekilde tasarlanmıştır.
+
+---
+
+**ServerBond Panel** - Professional server management made easy! 🚀
