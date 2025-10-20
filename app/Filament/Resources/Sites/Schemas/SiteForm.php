@@ -131,11 +131,17 @@ class SiteForm
                                     ->schema([
                                         TextInput::make('database_name')
                                             ->label('Database Adı')
-                                            ->placeholder('Otomatik oluşturulacak'),
+                                            ->placeholder('Otomatik oluşturulacak')
+                                            ->maxLength(64)
+                                            ->rule('nullable|regex:/^[A-Za-z0-9_]+$/')
+                                            ->helperText('Sadece harf, rakam ve alt çizgi kullanılabilir (maksimum 64 karakter).'),
 
                                         TextInput::make('database_user')
                                             ->label('Database Kullanıcısı')
-                                            ->placeholder('Otomatik oluşturulacak'),
+                                            ->placeholder('Otomatik oluşturulacak')
+                                            ->maxLength(64)
+                                            ->rule('nullable|regex:/^[A-Za-z0-9_]+$/')
+                                            ->helperText('Sadece harf, rakam ve alt çizgi kullanılabilir (maksimum 64 karakter).'),
 
                                         TextInput::make('database_password')
                                             ->label('Database Şifresi')
