@@ -84,20 +84,11 @@ class DeploymentService
             ]);
         }
 
-        // 2. Type-specific deployment
-        match($site->type->value) {
-            'laravel' => $this->deployLaravel($site, $rootPath, $output),
-            'php' => $this->deployPHP($site, $rootPath, $output),
-            'nodejs' => $this->deployNodeJS($site, $rootPath, $output),
-            'python' => $this->deployPython($site, $rootPath, $output),
-            'static' => $this->deployStatic($site, $rootPath, $output),
-            default => null,
-        };
-
-        // 3. Set permissions
-        $output[] = "Setting permissions...";
-        Process::run("chown -R www-data:www-data {$rootPath}");
-        Process::run("chmod -R 755 {$rootPath}");
+        // 2. Run custom deployment script
+        if ($site->deployment_script) {
+            $output[] = "Running deployment script...";
+            $this->runDeploymentScript($site, $rootPath, $output);
+        }
 
         // Update deployment
         $deployment->update([
@@ -113,77 +104,31 @@ class DeploymentService
         ]);
     }
 
-    protected function deployLaravel(Site $site, string $rootPath, array &$output): void
+    protected function runDeploymentScript(Site $site, string $rootPath, array &$output): void
     {
-        // Install dependencies
-        $output[] = "Installing Composer dependencies...";
-        $result = Process::path($rootPath)->run('composer install --no-dev --optimize-autoloader');
-        $output[] = $result->output();
+        // Create temporary script file
+        $scriptPath = $rootPath . '/deploy-script.sh';
+        File::put($scriptPath, $site->deployment_script);
 
-        // Run migrations
-        $output[] = "Running migrations...";
-        $result = Process::path($rootPath)->run('php artisan migrate --force');
-        $output[] = $result->output();
+        // Make script executable
+        chmod($scriptPath, 0755);
 
-        // Clear and cache config
-        $output[] = "Optimizing...";
-        Process::path($rootPath)->run('php artisan config:cache');
-        Process::path($rootPath)->run('php artisan route:cache');
-        Process::path($rootPath)->run('php artisan view:cache');
+        try {
+            // Run the deployment script
+            $result = Process::path($rootPath)
+                ->timeout(600) // 10 dakika timeout
+                ->run('bash deploy-script.sh');
 
-        // Storage link
-        if (!File::exists("{$rootPath}/public/storage")) {
-            Process::path($rootPath)->run('php artisan storage:link');
-        }
-
-        // NPM (if package.json exists)
-        if (File::exists("{$rootPath}/package.json")) {
-            $output[] = "Installing NPM dependencies...";
-            Process::path($rootPath)->run('npm install');
-            Process::path($rootPath)->run('npm run build');
-        }
-    }
-
-    protected function deployPHP(Site $site, string $rootPath, array &$output): void
-    {
-        // Composer if exists
-        if (File::exists("{$rootPath}/composer.json")) {
-            $output[] = "Installing Composer dependencies...";
-            $result = Process::path($rootPath)->run('composer install --no-dev --optimize-autoloader');
             $output[] = $result->output();
+
+            if (!$result->successful()) {
+                throw new \Exception("Deployment script failed: " . $result->errorOutput());
+            }
+        } finally {
+            // Clean up script file
+            if (File::exists($scriptPath)) {
+                File::delete($scriptPath);
+            }
         }
-    }
-
-    protected function deployNodeJS(Site $site, string $rootPath, array &$output): void
-    {
-        $output[] = "Installing NPM dependencies...";
-        $result = Process::path($rootPath)->run('npm install');
-        $output[] = $result->output();
-
-        $output[] = "Building project...";
-        $result = Process::path($rootPath)->run('npm run build');
-        $output[] = $result->output();
-
-        $output[] = "Restarting PM2...";
-        Process::path($rootPath)->run("pm2 restart {$site->domain} || pm2 start npm --name {$site->domain} -- start");
-    }
-
-    protected function deployPython(Site $site, string $rootPath, array &$output): void
-    {
-        $output[] = "Installing Python dependencies...";
-
-        if (File::exists("{$rootPath}/requirements.txt")) {
-            $result = Process::path($rootPath)->run('pip3 install -r requirements.txt');
-            $output[] = $result->output();
-        }
-
-        $output[] = "Restarting service...";
-        Process::run("systemctl restart {$site->domain}");
-    }
-
-    protected function deployStatic(Site $site, string $rootPath, array &$output): void
-    {
-        $output[] = "Static site deployed successfully.";
     }
 }
-

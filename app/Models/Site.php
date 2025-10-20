@@ -34,6 +34,7 @@ class Site extends Model
         'deploy_webhook_token',
         'last_deployed_at',
         'notes',
+        'deployment_script',
     ];
 
     protected $casts = [
@@ -78,5 +79,154 @@ class Site extends Model
     public function isDeploying(): bool
     {
         return $this->status === SiteStatus::Deploying;
+    }
+
+    protected static function booted(): void
+    {
+        static::creating(function (Site $site) {
+            // Deployment script yoksa, site tipine göre default oluştur
+            if (empty($site->deployment_script)) {
+                $site->deployment_script = static::getDefaultDeploymentScript($site->type);
+            }
+        });
+    }
+
+    public static function getDefaultDeploymentScript(SiteType $type): string
+    {
+        return match ($type) {
+            SiteType::Laravel => <<<'BASH'
+#!/bin/bash
+set -e
+
+echo "🚀 Laravel Deployment Başlıyor..."
+
+# Composer bağımlılıklarını yükle
+echo "📦 Composer bağımlılıkları yükleniyor..."
+composer install --no-dev --optimize-autoloader --no-interaction
+
+# Cache'leri temizle
+echo "🧹 Cache temizleniyor..."
+php artisan config:clear
+php artisan cache:clear
+php artisan route:clear
+php artisan view:clear
+
+# Migration'ları çalıştır
+echo "🗄️  Migration'lar çalıştırılıyor..."
+php artisan migrate --force
+
+# Cache'leri optimize et
+echo "⚡ Optimizasyon yapılıyor..."
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+
+# Storage link oluştur
+echo "🔗 Storage link oluşturuluyor..."
+php artisan storage:link
+
+# Permissions düzenle
+echo "🔐 İzinler ayarlanıyor..."
+chmod -R 775 storage bootstrap/cache
+chown -R www-data:www-data storage bootstrap/cache
+
+echo "✅ Laravel Deployment Tamamlandı!"
+BASH,
+
+            SiteType::PHP => <<<'BASH'
+#!/bin/bash
+set -e
+
+echo "🚀 PHP Deployment Başlıyor..."
+
+# Composer varsa bağımlılıkları yükle
+if [ -f "composer.json" ]; then
+    echo "📦 Composer bağımlılıkları yükleniyor..."
+    composer install --no-dev --optimize-autoloader --no-interaction
+fi
+
+# Permissions düzenle
+echo "🔐 İzinler ayarlanıyor..."
+find . -type f -exec chmod 644 {} \;
+find . -type d -exec chmod 755 {} \;
+
+echo "✅ PHP Deployment Tamamlandı!"
+BASH,
+
+            SiteType::Static => <<<'BASH'
+#!/bin/bash
+set -e
+
+echo "🚀 Static Site Deployment Başlıyor..."
+
+# NPM bağımlılıkları varsa yükle
+if [ -f "package.json" ]; then
+    echo "📦 NPM bağımlılıkları yükleniyor..."
+    npm ci
+    
+    echo "🏗️  Build ediliyor..."
+    npm run build
+fi
+
+# Permissions düzenle
+echo "🔐 İzinler ayarlanıyor..."
+find . -type f -exec chmod 644 {} \;
+find . -type d -exec chmod 755 {} \;
+
+echo "✅ Static Site Deployment Tamamlandı!"
+BASH,
+
+            SiteType::NodeJS => <<<'BASH'
+#!/bin/bash
+set -e
+
+echo "🚀 Node.js Deployment Başlıyor..."
+
+# NPM bağımlılıklarını yükle
+echo "📦 NPM bağımlılıkları yükleniyor..."
+npm ci --production
+
+# PM2 ile uygulamayı yeniden başlat
+echo "🔄 Uygulama yeniden başlatılıyor..."
+pm2 restart ecosystem.config.js --update-env || pm2 start ecosystem.config.js
+
+echo "✅ Node.js Deployment Tamamlandı!"
+BASH,
+
+            SiteType::Python => <<<'BASH'
+#!/bin/bash
+set -e
+
+echo "🚀 Python Deployment Başlıyor..."
+
+# Virtual environment oluştur veya güncelle
+echo "🐍 Virtual environment kontrol ediliyor..."
+if [ ! -d "venv" ]; then
+    python3 -m venv venv
+fi
+
+# Virtual environment'ı aktifleştir
+source venv/bin/activate
+
+# Bağımlılıkları yükle
+echo "📦 Python bağımlılıkları yükleniyor..."
+pip install -r requirements.txt
+
+# Django migration (eğer Django ise)
+if [ -f "manage.py" ]; then
+    echo "🗄️  Django migration'ları çalıştırılıyor..."
+    python manage.py migrate --noinput
+    
+    echo "📦 Static dosyalar toplanıyor..."
+    python manage.py collectstatic --noinput
+fi
+
+# Gunicorn'u yeniden başlat
+echo "🔄 Uygulama yeniden başlatılıyor..."
+sudo systemctl restart gunicorn || echo "Gunicorn yeniden başlatılamadı"
+
+echo "✅ Python Deployment Tamamlandı!"
+BASH,
+        };
     }
 }

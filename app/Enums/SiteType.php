@@ -34,3 +34,4 @@ enum SiteType: string
         };
     }
 }
+

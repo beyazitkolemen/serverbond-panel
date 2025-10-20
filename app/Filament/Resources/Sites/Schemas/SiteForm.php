@@ -6,12 +6,15 @@ namespace App\Filament\Resources\Sites\Schemas;
 
 use App\Enums\SiteStatus;
 use App\Enums\SiteType;
-use Filament\Forms\Components\Section;
+use App\Models\Site;
+use App\Services\GitService;
+use Filament\Forms\Components\CodeEditor;
 use Filament\Forms\Components\Select;
-use Filament\Forms\Components\Tabs;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Tabs;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Str;
 
@@ -33,7 +36,7 @@ class SiteForm
                                             ->required()
                                             ->maxLength(255)
                                             ->live(onBlur: true)
-                                            ->afterStateUpdated(fn ($state, callable $set) => $set('domain', Str::slug($state) . '.test')),
+                                            ->afterStateUpdated(fn($state, callable $set) => $set('domain', Str::slug($state) . '.test')),
 
                                         TextInput::make('domain')
                                             ->label('Alan Adı')
@@ -88,7 +91,7 @@ class SiteForm
                                             ])
                                             ->default('8.4')
                                             ->native(false)
-                                            ->visible(fn ($get) => in_array($get('type'), [SiteType::Laravel, SiteType::PHP])),
+                                            ->visible(fn($get) => in_array($get('type'), [SiteType::Laravel, SiteType::PHP])),
                                     ])
                                     ->columns(2),
                             ]),
@@ -102,12 +105,67 @@ class SiteForm
                                             ->label('Git Repository')
                                             ->url()
                                             ->placeholder('https://github.com/user/repo.git')
-                                            ->helperText('GitHub, GitLab veya Bitbucket repository URL'),
+                                            ->helperText('GitHub, GitLab veya Bitbucket repository URL')
+                                            ->live(onBlur: true)
+                                            ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                                                if (!empty($state)) {
+                                                    $gitService = app(GitService::class);
 
-                                        TextInput::make('git_branch')
+                                                    // Branch'leri çek ve options olarak ayarla
+                                                    $branches = $gitService->listRemoteBranches($state);
+
+                                                    if (!empty($branches)) {
+                                                        // İlk branch'i seç veya default branch'i bul
+                                                        $defaultBranch = $gitService->detectDefaultBranch($state);
+
+                                                        // Branch henüz seçilmediyse default'u seç
+                                                        if (empty($get('git_branch'))) {
+                                                            $set('git_branch', $defaultBranch);
+                                                        }
+                                                    }
+
+                                                    // Site adı boşsa, repository adından oluştur
+                                                    if (empty($get('name'))) {
+                                                        $projectName = $gitService->extractProjectName($state);
+                                                        if ($projectName) {
+                                                            $set('name', ucfirst($projectName));
+                                                            $set('domain', Str::slug($projectName) . '.test');
+                                                        }
+                                                    }
+                                                }
+                                            }),
+
+                                        Select::make('git_branch')
                                             ->label('Branch')
-                                            ->default('main')
-                                            ->helperText('Deploy edilecek branch'),
+                                            ->placeholder('Önce repository girin')
+                                            ->helperText('Deploy edilecek branch seçin')
+                                            ->options(function (callable $get) {
+                                                $repository = $get('git_repository');
+
+                                                if (empty($repository)) {
+                                                    return [];
+                                                }
+
+                                                $gitService = app(GitService::class);
+                                                $branches = $gitService->listRemoteBranches($repository);
+
+                                                if (empty($branches)) {
+                                                    // Fallback: Manuel giriş için bazı yaygın branch'ler
+                                                    return [
+                                                        'main' => 'main',
+                                                        'master' => 'master',
+                                                        'develop' => 'develop',
+                                                    ];
+                                                }
+
+                                                // Branch'leri key-value array'e çevir
+                                                return array_combine($branches, $branches);
+                                            })
+                                            ->searchable()
+                                            ->native(false)
+                                            ->live()
+                                            ->suffixIcon('heroicon-o-arrow-path-rounded-square')
+                                            ->preload(),
 
                                         Textarea::make('git_deploy_key')
                                             ->label('Deploy Key')
@@ -168,6 +226,21 @@ class SiteForm
                                             ->helperText('Otomatik oluşturulacak'),
                                     ])
                                     ->columns(2),
+                            ]),
+
+                        Tabs\Tab::make('Deployment Script')
+                            ->icon('heroicon-o-command-line')
+                            ->schema([
+                                Section::make()
+                                    ->description('Bu script, site deploy edildiğinde git pull sonrası otomatik olarak çalıştırılır.')
+                                    ->schema([
+                                        CodeEditor::make('deployment_script')
+                                            ->label('Deployment Script')
+                                            ->helperText('Site tipinize göre otomatik oluşturulmuştur. İhtiyacınıza göre düzenleyebilirsiniz.')
+                                            ->default(fn($get) => $get('type') ? Site::getDefaultDeploymentScript($get('type')) : '')
+                                            ->reactive()
+                                            ->columnSpanFull(),
+                                    ]),
                             ]),
 
                         Tabs\Tab::make('Notlar')
