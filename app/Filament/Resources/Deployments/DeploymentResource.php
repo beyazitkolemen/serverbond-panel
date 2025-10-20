@@ -20,6 +20,16 @@ class DeploymentResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
+    protected static ?string $navigationGroup = 'Site Yönetimi';
+
+    protected static ?string $navigationLabel = 'Deployments';
+
+    protected static ?string $modelLabel = 'Deployment';
+
+    protected static ?string $pluralModelLabel = 'Deployments';
+
+    protected static ?int $navigationSort = 2;
+
     public static function form(Schema $schema): Schema
     {
         return DeploymentForm::configure($schema);
@@ -41,8 +51,14 @@ class DeploymentResource extends Resource
     {
         return [
             'index' => ListDeployments::route('/'),
-            'create' => CreateDeployment::route('/create'),
-            'edit' => EditDeployment::route('/{record}/edit'),
+            // Create ve Edit'i devre dışı bırakıyoruz - deploymentlar otomatik oluşturulacak
+            // 'create' => CreateDeployment::route('/create'),
+            // 'edit' => EditDeployment::route('/{record}/edit'),
         ];
+    }
+
+    public static function canCreate(): bool
+    {
+        return false; // Deploymentlar manuel oluşturulamaz
     }
 }

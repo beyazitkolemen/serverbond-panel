@@ -22,6 +22,16 @@ class SiteResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
+    protected static ?string $navigationGroup = 'Site Yönetimi';
+
+    protected static ?string $navigationLabel = 'Siteler';
+
+    protected static ?string $modelLabel = 'Site';
+
+    protected static ?string $pluralModelLabel = 'Siteler';
+
+    protected static ?int $navigationSort = 1;
+
     public static function form(Schema $schema): Schema
     {
         return SiteForm::configure($schema);
