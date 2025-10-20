@@ -212,44 +212,38 @@ NGINX;
 
     public function testConfig(): array
     {
-        $result = Process::run('nginx -t');
-
-        return [
-            'success' => $result->successful(),
-            'output' => $result->output(),
-            'error' => $result->errorOutput(),
-        ];
+        return $this->runCommand(['nginx', '-t']);
     }
 
     public function reload(): array
     {
-        $result = Process::run('systemctl reload nginx');
-
-        return [
-            'success' => $result->successful(),
-            'output' => $result->output(),
-            'error' => $result->errorOutput(),
-        ];
+        return $this->runCommand(['systemctl', 'reload', 'nginx']);
     }
 
     public function restart(): array
     {
-        $result = Process::run('systemctl restart nginx');
+        return $this->runCommand(['systemctl', 'restart', 'nginx']);
+    }
+
+    public function getStatus(): array
+    {
+        $result = Process::run(['systemctl', 'status', 'nginx']);
 
         return [
-            'success' => $result->successful(),
+            'running' => $result->successful(),
             'output' => $result->output(),
             'error' => $result->errorOutput(),
         ];
     }
 
-    public function getStatus(): array
+    protected function runCommand(array $command): array
     {
-        $result = Process::run('systemctl status nginx');
+        $result = Process::run($command);
 
         return [
-            'running' => $result->successful(),
+            'success' => $result->successful(),
             'output' => $result->output(),
+            'error' => $result->errorOutput(),
         ];
     }
 }

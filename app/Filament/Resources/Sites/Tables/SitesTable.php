@@ -10,6 +10,7 @@ use App\Enums\SiteType;
 use App\Services\DeploymentService;
 use App\Services\MySQLService;
 use App\Services\NginxService;
+use App\Services\RedisService;
 use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
@@ -24,6 +25,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
+use Throwable;
 
 class SitesTable
 {
@@ -177,8 +179,14 @@ class SitesTable
                                     ->success()
                                     ->body("Database: {$result['database']}, User: {$result['user']}")
                                     ->send();
+                            } else {
+                                Notification::make()
+                                    ->title('Database Hatası')
+                                    ->danger()
+                                    ->body($result['error'] ?? 'Veritabanı oluşturulamadı.')
+                                    ->send();
                             }
-                        } catch (\Exception $e) {
+                        } catch (Throwable $e) {
                             Notification::make()
                                 ->title('Database Hatası')
                                 ->danger()
@@ -198,29 +206,95 @@ class SitesTable
 
                         try {
                             $config = $nginxService->generateConfig($record);
-                            $nginxService->writeConfig($record, $config);
-                            $nginxService->enableSite($record);
+                            if (! $nginxService->writeConfig($record, $config)) {
+                                Notification::make()
+                                    ->title('Nginx Hatası')
+                                    ->danger()
+                                    ->body('Konfigürasyon dosyası yazılamadı.')
+                                    ->send();
+
+                                return;
+                            }
+
+                            if (! $nginxService->enableSite($record)) {
+                                Notification::make()
+                                    ->title('Nginx Hatası')
+                                    ->danger()
+                                    ->body('Site linki oluşturulamadı.')
+                                    ->send();
+
+                                return;
+                            }
 
                             $test = $nginxService->testConfig();
 
-                            if ($test['success']) {
-                                $nginxService->reload();
-
-                                Notification::make()
-                                    ->title('Nginx Yapılandırıldı')
-                                    ->success()
-                                    ->body("'{$record->domain}' nginx konfigürasyonu oluşturuldu.")
-                                    ->send();
-                            } else {
+                            if (! $test['success']) {
                                 Notification::make()
                                     ->title('Nginx Test Hatası')
                                     ->danger()
-                                    ->body($test['error'])
+                                    ->body($test['error'] ?: 'nginx -t başarısız oldu.')
                                     ->send();
+
+                                return;
                             }
-                        } catch (\Exception $e) {
+
+                            $reload = $nginxService->reload();
+
+                            if (! $reload['success']) {
+                                Notification::make()
+                                    ->title('Nginx Yeniden Yüklenemedi')
+                                    ->danger()
+                                    ->body($reload['error'] ?: 'systemctl reload nginx başarısız oldu.')
+                                    ->send();
+
+                                return;
+                            }
+
+                            Notification::make()
+                                ->title('Nginx Yapılandırıldı')
+                                ->success()
+                                ->body("'{$record->domain}' nginx konfigürasyonu oluşturuldu.")
+                                ->send();
+                        } catch (Throwable $e) {
                             Notification::make()
                                 ->title('Nginx Hatası')
+                                ->danger()
+                                ->body($e->getMessage())
+                                ->send();
+                        }
+                    }),
+
+                Action::make('clearRedisCache')
+                    ->label('Redis Temizle')
+                    ->icon('heroicon-o-trash')
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->modalHeading('Redis Önbelleğini Temizle')
+                    ->modalDescription(fn ($record) => "'{$record->domain}' için Redis anahtarları temizlenecek. Emin misiniz?")
+                    ->action(function ($record) {
+                        $redisService = app(RedisService::class);
+
+                        try {
+                            $result = $redisService->clearSiteCache($record);
+
+                            if ($result['success']) {
+                                $deleted = $result['deleted'] ?? 0;
+
+                                Notification::make()
+                                    ->title('Redis Temizlendi')
+                                    ->success()
+                                    ->body("{$deleted} anahtar silindi ({$result['pattern']}).")
+                                    ->send();
+                            } else {
+                                Notification::make()
+                                    ->title('Redis Hatası')
+                                    ->danger()
+                                    ->body($result['error'] ?? 'Redis anahtarları temizlenemedi.')
+                                    ->send();
+                            }
+                        } catch (Throwable $e) {
+                            Notification::make()
+                                ->title('Redis Hatası')
                                 ->danger()
                                 ->body($e->getMessage())
                                 ->send();
