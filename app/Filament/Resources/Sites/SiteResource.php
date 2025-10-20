@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Filament\Resources\Sites;
 
 use App\Filament\Resources\Sites\Pages\CreateSite;

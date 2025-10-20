@@ -3,7 +3,7 @@
         <div class="p-4 bg-gray-100 dark:bg-gray-800 rounded-lg">
             <div class="text-sm text-gray-500 dark:text-gray-400">Durum</div>
             <div class="mt-1 flex items-center gap-2">
-                <x-filament::badge 
+                <x-filament::badge
                     :color="match($deployment->status->value) {
                         'success' => 'success',
                         'failed' => 'danger',

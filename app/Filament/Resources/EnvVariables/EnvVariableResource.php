@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Filament\Resources\EnvVariables;
 
 use App\Filament\Resources\EnvVariables\Pages\CreateEnvVariable;
@@ -19,15 +21,15 @@ class EnvVariableResource extends Resource
     protected static ?string $model = EnvVariable::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
-    
+
     protected static ?string $navigationGroup = 'Yapılandırma';
-    
+
     protected static ?string $navigationLabel = 'Environment Variables';
-    
+
     protected static ?string $modelLabel = 'Environment Variable';
-    
+
     protected static ?string $pluralModelLabel = 'Environment Variables';
-    
+
     protected static ?int $navigationSort = 1;
 
     public static function form(Schema $schema): Schema

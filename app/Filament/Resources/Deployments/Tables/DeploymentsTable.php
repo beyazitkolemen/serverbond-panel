@@ -24,14 +24,14 @@ class DeploymentsTable
                 TextColumn::make('id')
                     ->label('#')
                     ->sortable(),
-                
+
                 TextColumn::make('site.name')
                     ->label('Site')
                     ->searchable()
                     ->sortable()
                     ->icon('heroicon-o-globe-alt')
                     ->weight('bold'),
-                
+
                 BadgeColumn::make('status')
                     ->label('Durum')
                     ->formatStateUsing(fn ($state) => $state->label())
@@ -47,7 +47,7 @@ class DeploymentsTable
                         'heroicon-o-check-circle' => DeploymentStatus::Success,
                         'heroicon-o-x-circle' => DeploymentStatus::Failed,
                     ]),
-                
+
                 BadgeColumn::make('trigger')
                     ->label('Tetikleyici')
                     ->formatStateUsing(fn ($state) => $state->label())
@@ -56,7 +56,7 @@ class DeploymentsTable
                         'warning' => DeploymentTrigger::Auto,
                         'info' => DeploymentTrigger::Webhook,
                     ]),
-                
+
                 TextColumn::make('commit_hash')
                     ->label('Commit')
                     ->limit(8)
@@ -64,39 +64,39 @@ class DeploymentsTable
                     ->copyMessage('Commit hash kopyalandı!')
                     ->placeholder('-')
                     ->toggleable(),
-                
+
                 TextColumn::make('commit_message')
                     ->label('Mesaj')
                     ->limit(30)
                     ->placeholder('-')
                     ->tooltip(fn ($record) => $record->commit_message)
                     ->toggleable(),
-                
+
                 TextColumn::make('commit_author')
                     ->label('Yazar')
                     ->placeholder('-')
                     ->icon('heroicon-o-user')
                     ->toggleable(isToggledHiddenByDefault: true),
-                
+
                 TextColumn::make('user.name')
                     ->label('Deploy Eden')
                     ->placeholder('Sistem')
                     ->icon('heroicon-o-user-circle')
                     ->toggleable(),
-                
+
                 TextColumn::make('duration')
                     ->label('Süre')
                     ->formatStateUsing(fn ($state) => $state ? gmdate('i:s', $state) . ' dk' : '-')
                     ->sortable()
                     ->icon('heroicon-o-clock'),
-                
+
                 TextColumn::make('started_at')
                     ->label('Başlangıç')
                     ->dateTime('d M Y, H:i')
                     ->sortable()
                     ->placeholder('-')
                     ->toggleable(),
-                
+
                 TextColumn::make('finished_at')
                     ->label('Bitiş')
                     ->dateTime('d M Y, H:i')
@@ -109,12 +109,12 @@ class DeploymentsTable
                     ->label('Durum')
                     ->options(DeploymentStatus::class)
                     ->multiple(),
-                
+
                 SelectFilter::make('trigger')
                     ->label('Tetikleyici')
                     ->options(DeploymentTrigger::class)
                     ->multiple(),
-                
+
                 SelectFilter::make('site_id')
                     ->label('Site')
                     ->relationship('site', 'name')
@@ -130,7 +130,7 @@ class DeploymentsTable
                     ->modalContent(fn ($record) => view('filament.deployment-logs', ['deployment' => $record]))
                     ->modalWidth('5xl')
                     ->slideOver(),
-                
+
                 Action::make('viewOutput')
                     ->label('Çıktı')
                     ->icon('heroicon-o-code-bracket')
@@ -146,7 +146,7 @@ class DeploymentsTable
                     ])
                     ->modalSubmitAction(false)
                     ->modalCancelActionLabel('Kapat'),
-                
+
                 Action::make('viewError')
                     ->label('Hata')
                     ->icon('heroicon-o-exclamation-triangle')

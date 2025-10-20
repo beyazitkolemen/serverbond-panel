@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Filament\Resources\SslCertificates;
 
 use App\Filament\Resources\SslCertificates\Pages\CreateSslCertificate;
@@ -19,15 +21,15 @@ class SslCertificateResource extends Resource
     protected static ?string $model = SslCertificate::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
-    
+
     protected static ?string $navigationGroup = 'Güvenlik';
-    
+
     protected static ?string $navigationLabel = 'SSL Sertifikaları';
-    
+
     protected static ?string $modelLabel = 'SSL Sertifikası';
-    
+
     protected static ?string $pluralModelLabel = 'SSL Sertifikaları';
-    
+
     protected static ?int $navigationSort = 1;
 
     public static function form(Schema $schema): Schema
