@@ -37,7 +37,21 @@ class SiteForm
                                             ->required()
                                             ->maxLength(255)
                                             ->live(onBlur: true)
-                                            ->afterStateUpdated(fn($state, callable $set) => $set('domain', Str::slug($state) . '.test')),
+                                            ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                                                // Domain güncelle
+                                                $set('domain', Str::slug($state) . '.test');
+
+                                                // Database oluşturma aktifse ve database adı boşsa
+                                                if ($get('create_database') && !$get('database_name')) {
+                                                    $dbPrefix = 'sb_' . Str::slug($state, '_');
+                                                    $dbPrefix = preg_replace('/[^a-zA-Z0-9_]/', '', $dbPrefix);
+                                                    $dbPrefix = substr($dbPrefix, 0, 60);
+
+                                                    $set('database_name', $dbPrefix . '_db');
+                                                    $set('database_user', $dbPrefix . '_user');
+                                                    $set('database_password', Str::random(16));
+                                                }
+                                            }),
 
                                         TextInput::make('domain')
                                             ->label('Alan Adı')
@@ -201,30 +215,68 @@ class SiteForm
                             ->icon('heroicon-o-cog-6-tooth')
                             ->schema([
                                 Section::make('Database')
-                                    ->description('Bu alanlar boş bırakılırsa deployment sırasında otomatik oluşturulur.')
+                                    ->description('Database oluşturmak istiyorsanız aktifleştirin. Alanlar otomatik doldurulur.')
                                     ->schema([
+                                        Toggle::make('create_database')
+                                            ->label('Database Oluştur')
+                                            ->helperText('Deployment sırasında otomatik database oluşturulsun mu?')
+                                            ->default(true)
+                                            ->live()
+                                            ->dehydrated(false) // Veritabanına kaydedilmez, sadece form'da kullanılır
+                                            ->afterStateHydrated(function ($component, $state, $record) {
+                                                // Edit modunda, database bilgileri varsa toggle'ı aktif göster
+                                                if ($record && ($record->database_name || $record->database_user || $record->database_password)) {
+                                                    $component->state(true);
+                                                }
+                                            })
+                                            ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                                                if ($state && !$get('database_name')) {
+                                                    $name = $get('name');
+                                                    if ($name) {
+                                                        $dbPrefix = 'sb_' . Str::slug($name, '_');
+                                                        $dbPrefix = preg_replace('/[^a-zA-Z0-9_]/', '', $dbPrefix);
+                                                        $dbPrefix = substr($dbPrefix, 0, 60); // MySQL limiti
+
+                                                        $set('database_name', $dbPrefix . '_db');
+                                                        $set('database_user', $dbPrefix . '_user');
+                                                        $set('database_password', Str::random(16));
+                                                    }
+                                                } elseif (!$state) {
+                                                    // Toggle kapatıldığında database bilgilerini temizle
+                                                    $set('database_name', null);
+                                                    $set('database_user', null);
+                                                    $set('database_password', null);
+                                                }
+                                            })
+                                            ->visible(fn($get) => in_array($get('type'), [SiteType::Laravel, SiteType::PHP]))
+                                            ->columnSpanFull(),
+
                                         TextInput::make('database_name')
                                             ->label('Database Adı')
                                             ->placeholder('Otomatik oluşturulacak')
                                             ->maxLength(64)
-                                            ->rule('nullable|regex:/^[A-Za-z0-9_]+$/')
-                                            ->helperText('Sadece harf, rakam ve alt çizgi kullanılabilir (maksimum 64 karakter).'),
+                                            ->rule('nullable|regex:/^[a-zA-Z0-9_]+$/')
+                                            ->helperText('Sadece harf, rakam ve alt çizgi kullanılabilir')
+                                            ->visible(fn($get) => $get('create_database') === true),
 
                                         TextInput::make('database_user')
                                             ->label('Database Kullanıcısı')
                                             ->placeholder('Otomatik oluşturulacak')
                                             ->maxLength(64)
-                                            ->rule('nullable|regex:/^[A-Za-z0-9_]+$/')
-                                            ->helperText('Sadece harf, rakam ve alt çizgi kullanılabilir (maksimum 64 karakter).'),
+                                            ->rule('nullable|regex:/^[a-zA-Z0-9_]+$/')
+                                            ->helperText('Sadece harf, rakam ve alt çizgi kullanılabilir')
+                                            ->visible(fn($get) => $get('create_database') === true),
 
                                         TextInput::make('database_password')
                                             ->label('Database Şifresi')
-                                            ->password()
                                             ->revealable()
-                                            ->placeholder('Otomatik oluşturulacak'),
+                                            ->placeholder('Otomatik oluşturulacak')
+                                            ->helperText('Güvenli bir şifre otomatik oluşturulur')
+                                            ->visible(fn($get) => $get('create_database') === true),
                                     ])
                                     ->columns(3)
-                                    ->collapsible(),
+                                    ->collapsible()
+                                    ->visible(fn($get) => in_array($get('type'), [SiteType::Laravel, SiteType::PHP])),
 
                                 Section::make('SSL & Güvenlik')
                                     ->schema([
