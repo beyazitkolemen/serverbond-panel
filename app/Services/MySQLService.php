@@ -168,8 +168,9 @@ class MySQLService
                 $slug = preg_replace('/_+/', '_', $slug); // Birden fazla underscore'u tek yap
                 $slug = trim($slug, '_'); // Başındaki/sonundaki underscore'ları kaldır
 
-                $dbName = $this->normalizeIdentifier('sb_' . $slug . '_db');
-                $dbUser = $this->normalizeIdentifier('sb_' . $slug . '_user');
+                // Database ve user adı aynı olsun (prefix yok)
+                $dbName = $this->normalizeIdentifier($slug);
+                $dbUser = $this->normalizeIdentifier($slug);
                 $dbPassword = Str::random(32);
 
                 \Log::info('MySQLService: Generated new credentials', [
