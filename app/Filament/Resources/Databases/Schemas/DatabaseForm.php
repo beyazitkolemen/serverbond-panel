@@ -45,8 +45,6 @@ class DatabaseForm
 
                         TextInput::make('password')
                             ->label('Şifre')
-                            ->password()
-                            ->revealable()
                             ->copyable()
                             ->required()
                             ->default(fn() => Str::random(32))

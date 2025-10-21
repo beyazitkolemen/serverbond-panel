@@ -20,9 +20,6 @@ class Database extends Model
         'notes',
     ];
 
-    protected $hidden = [
-        'password',
-    ];
 
     protected $casts = [
         'max_connections' => 'integer',
