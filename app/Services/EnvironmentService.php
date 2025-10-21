@@ -48,29 +48,19 @@ class EnvironmentService
         $result = $this->mySQLService->createDatabaseForSite($site);
 
         if (($result['success'] ?? false) === true) {
-            $site->fill([
-                'database_name' => $result['database'],
-                'database_user' => $result['user'],
-                'database_password' => $result['password'],
-            ]);
-
-            if ($site->isDirty(['database_name', 'database_user', 'database_password'])) {
-                $site->save();
-                $site->refresh();
-            }
-
             $this->notify(
                 $outputCallback,
-                sprintf('Database ready (name: %s, user: %s).', $result['database'], $result['user'])
+                sprintf('Database created/verified (name: %s, user: %s).', $result['database'], $result['user'])
             );
 
+            // Plain text password'ü direkt döndür (MySQLService'den gelen)
             return [
                 'connection' => config('deployment.database.connection'),
                 'host' => config('deployment.database.host'),
                 'port' => config('deployment.database.port'),
                 'database' => $result['database'],
                 'username' => $result['user'],
-                'password' => $result['password'],
+                'password' => $result['password'], // Plain text
             ];
         }
 
@@ -78,13 +68,17 @@ class EnvironmentService
             $this->notify($outputCallback, 'Using existing database credentials stored for the site.');
 
             // Site'den oku - database_password attribute'ü otomatik decrypt eder
+            $password = $site->database_password; // Decrypt edilmiş
+
+            $this->notify($outputCallback, sprintf('Retrieved password length: %d', strlen($password)));
+
             return [
                 'connection' => config('deployment.database.connection'),
                 'host' => config('deployment.database.host'),
                 'port' => config('deployment.database.port'),
                 'database' => $site->database_name,
                 'username' => $site->database_user,
-                'password' => $site->database_password, // Attribute sayesinde decrypt edilmiş
+                'password' => $password, // Decrypt edilmiş password
             ];
         }
 
@@ -127,12 +121,23 @@ class EnvironmentService
     {
         // Sadece database bilgileri varsa yaz
         if (!empty($credentials['database']) && !empty($credentials['username'])) {
+            $this->notify(null, sprintf('Applying database config - DB: %s, User: %s, Pass: %s',
+                $credentials['database'],
+                $credentials['username'],
+                !empty($credentials['password']) ? '[SET]' : '[EMPTY]'
+            ));
+
             $envContent = $this->setEnvValue($envContent, 'DB_CONNECTION', $credentials['connection']);
             $envContent = $this->setEnvValue($envContent, 'DB_HOST', $credentials['host']);
-            $envContent = $this->setEnvValue($envContent, 'DB_PORT', $credentials['port']);
+            $envContent = $this->setEnvValue($envContent, 'DB_PORT', (string) $credentials['port']);
             $envContent = $this->setEnvValue($envContent, 'DB_DATABASE', $credentials['database']);
             $envContent = $this->setEnvValue($envContent, 'DB_USERNAME', $credentials['username']);
             $envContent = $this->setEnvValue($envContent, 'DB_PASSWORD', $credentials['password'] ?? '');
+        } else {
+            $this->notify(null, sprintf('Database config skipped - DB: %s, User: %s',
+                $credentials['database'] ?? 'empty',
+                $credentials['username'] ?? 'empty'
+            ));
         }
 
         return $envContent;

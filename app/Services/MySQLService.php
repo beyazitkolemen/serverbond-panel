@@ -81,17 +81,27 @@ class MySQLService
             $privilegesGranted = $this->grantPrivileges($dbName, $dbUser);
 
             if ($databaseCreated && $userCreated && $privilegesGranted) {
-                $site->update([
-                    'database_name' => $dbName,
-                    'database_user' => $dbUser,
-                    'database_password' => $dbPassword,
-                ]);
+                // Site'ye kaydetme - sadece boş olan alanları güncelle
+                $updates = [];
+                if (!$site->database_name) {
+                    $updates['database_name'] = $dbName;
+                }
+                if (!$site->database_user) {
+                    $updates['database_user'] = $dbUser;
+                }
+                if (!$site->database_password) {
+                    $updates['database_password'] = $dbPassword;
+                }
+
+                if (!empty($updates)) {
+                    $site->update($updates);
+                }
 
                 return [
                     'success' => true,
                     'database' => $dbName,
                     'user' => $dbUser,
-                    'password' => $dbPassword,
+                    'password' => $dbPassword, // Plain text password döndür
                 ];
             }
 
@@ -272,11 +282,11 @@ class MySQLService
     {
         try {
             $info = $this->connection()
-                ->select("SELECT 
+                ->select("SELECT
                     SCHEMA_NAME as name,
                     DEFAULT_CHARACTER_SET_NAME as charset,
                     DEFAULT_COLLATION_NAME as collation
-                FROM information_schema.SCHEMATA 
+                FROM information_schema.SCHEMATA
                 WHERE SCHEMA_NAME = ?", [$databaseName]);
 
             return $info ? (array) $info[0] : null;
@@ -329,5 +339,35 @@ class MySQLService
             'skipped' => $skipped,
             'total' => count($databases),
         ];
+    }
+
+    /**
+     * MySQL bağlantısını test et
+     */
+    public function testConnection(): array
+    {
+        try {
+            $connection = $this->connection();
+
+            // Basit bir query ile test et
+            $result = $connection->select('SELECT 1 as test');
+
+            if (!empty($result)) {
+                return [
+                    'success' => true,
+                    'message' => 'MySQL bağlantısı başarılı',
+                ];
+            }
+
+            return [
+                'success' => false,
+                'error' => 'MySQL bağlantısı test edilemedi',
+            ];
+        } catch (Throwable $e) {
+            return [
+                'success' => false,
+                'error' => $e->getMessage(),
+            ];
+        }
     }
 }
