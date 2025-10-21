@@ -38,20 +38,6 @@ class EnvironmentService
 
     private function provisionDatabase(Site $site, ?callable $outputCallback): array
     {
-        // Eğer database oluşturma kapalıysa veya bilgiler yoksa boş dön
-        if (!$site->database_name && !$site->database_user) {
-            $this->notify($outputCallback, 'Database provisioning skipped (not configured).');
-
-            return [
-                'connection' => config('deployment.database.connection'),
-                'host' => config('deployment.database.host'),
-                'port' => config('deployment.database.port'),
-                'database' => '',
-                'username' => '',
-                'password' => '',
-            ];
-        }
-
         $this->notify($outputCallback, 'Ensuring MySQL database is provisioned...');
 
         $result = $this->mySQLService->createDatabaseForSite($site);

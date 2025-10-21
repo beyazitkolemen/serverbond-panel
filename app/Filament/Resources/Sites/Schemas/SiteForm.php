@@ -203,28 +203,6 @@ class SiteForm
                         Tabs\Tab::make('Gelişmiş')
                             ->icon('heroicon-o-cog-6-tooth')
                             ->schema([
-                                Section::make('Database')
-                                    ->description('Site deploy edildiğinde otomatik olarak MySQL database oluşturulur.')
-                                    ->schema([
-                                        Toggle::make('create_database')
-                                            ->label('Otomatik Database Oluştur')
-                                            ->helperText('Deployment sırasında otomatik database ve kullanıcı oluşturulsun mu?')
-                                            ->default(true)
-                                            ->dehydrated(false)
-                                            ->afterStateUpdated(function ($state, callable $set) {
-                                                if (!$state) {
-                                                    // Toggle kapatıldığında bilgileri temizle
-                                                    $set('database_name', null);
-                                                    $set('database_user', null);
-                                                    $set('database_password', null);
-                                                }
-                                            })
-                                            ->visible(fn($get) => in_array($get('type'), [SiteType::Laravel, SiteType::PHP]))
-                                            ->columnSpanFull(),
-                                    ])
-                                    ->collapsible()
-                                    ->visible(fn($get) => in_array($get('type'), [SiteType::Laravel, SiteType::PHP])),
-
                                 Section::make('Database Bilgileri')
                                     ->description('Deployment sonrası oluşturulan database bilgilerini buradan görebilirsiniz.')
                                     ->schema([
