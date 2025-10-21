@@ -144,13 +144,19 @@ class MySQLService
                     'pass_length' => strlen($dbPassword),
                 ]);
             } else {
-                // Yeni bilgiler oluştur
-                $slug = Str::slug($site->domain, '_');
+                // Yeni bilgiler oluştur - domain'deki noktaları underscore'a çevir
+                $slug = str_replace(['.', '-'], '_', $site->domain);
+                $slug = preg_replace('/[^a-zA-Z0-9_]/', '', $slug); // Sadece harf, rakam, underscore
+                $slug = preg_replace('/_+/', '_', $slug); // Birden fazla underscore'u tek yap
+                $slug = trim($slug, '_'); // Başındaki/sonundaki underscore'ları kaldır
+
                 $dbName = $this->normalizeIdentifier('sb_' . $slug . '_db');
                 $dbUser = $this->normalizeIdentifier('sb_' . $slug . '_user');
                 $dbPassword = Str::random(32);
 
                 \Log::info('MySQLService: Generated new credentials', [
+                    'domain' => $site->domain,
+                    'slug' => $slug,
                     'db' => $dbName,
                     'user' => $dbUser,
                     'pass_length' => strlen($dbPassword),
@@ -176,7 +182,7 @@ class MySQLService
                         'database_user' => $dbUser,
                         'database_password' => $dbPassword, // Plain text
                     ]);
-                    
+
                     \Log::info('MySQLService: Saved credentials to site', [
                         'site_id' => $site->id,
                         'db_created' => $databaseCreated,
