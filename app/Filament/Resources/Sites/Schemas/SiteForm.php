@@ -74,9 +74,9 @@ class SiteForm
                                             ->label('Ana Dizin')
                                             ->required()
                                             ->default(fn() => env('APP_ENV') === 'local'
-                                                ? $_SERVER['HOME'] . '/sites'
+                                                ? storage_path('app/sites')
                                                 : '/var/www')
-                                            ->helperText('Site dosyalarının ana dizini (local: ~/sites, production: /var/www)'),
+                                            ->helperText('Site dosyalarının ana dizini (local: storage/app/sites, production: /var/www)'),
 
                                         TextInput::make('public_directory')
                                             ->label('Public Dizin')
