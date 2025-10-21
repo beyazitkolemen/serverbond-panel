@@ -167,7 +167,8 @@ class MySQLService
             $privilegesGranted = $this->grantPrivileges($dbName, $dbUser);
             \Log::info('MySQLService: grantPrivileges result', ['success' => $privilegesGranted]);
 
-            if ($databaseCreated && $userCreated && $privilegesGranted) {
+            // En az database oluşturulduysa devam et (user/privileges opsiyonel olabilir)
+            if ($databaseCreated) {
                 // Yeni oluşturduysak site'ye kaydet
                 if (!$hasCredentials) {
                     $site->update([
@@ -175,22 +176,35 @@ class MySQLService
                         'database_user' => $dbUser,
                         'database_password' => $dbPassword, // Plain text
                     ]);
-
+                    
                     \Log::info('MySQLService: Saved credentials to site', [
                         'site_id' => $site->id,
+                        'db_created' => $databaseCreated,
+                        'user_created' => $userCreated,
+                        'privileges_granted' => $privilegesGranted,
                     ]);
                 }
 
-                // Kullanılan bilgileri döndür (MySQL ve .env için AYNI)
+                // User veya privileges başarısız olduysa uyar
+                if (!$userCreated || !$privilegesGranted) {
+                    \Log::warning('MySQLService: Partial success - database created but user/privileges may have issues', [
+                        'database_created' => $databaseCreated,
+                        'user_created' => $userCreated,
+                        'privileges_granted' => $privilegesGranted,
+                    ]);
+                }
+
+                // Bilgileri döndür (MySQL ve .env için AYNI)
                 return [
                     'success' => true,
                     'database' => $dbName,
                     'user' => $dbUser,
                     'password' => $dbPassword, // Plain text
+                    'partial' => !$userCreated || !$privilegesGranted,
                 ];
             }
 
-            \Log::error('MySQLService: Failed to create database components', [
+            \Log::error('MySQLService: Database creation completely failed', [
                 'database_created' => $databaseCreated,
                 'user_created' => $userCreated,
                 'privileges_granted' => $privilegesGranted,
@@ -199,7 +213,7 @@ class MySQLService
             return [
                 'success' => false,
                 'error' => sprintf(
-                    'Veritabanı oluşturma başarısız (DB: %s, User: %s, Privileges: %s)',
+                    'Veritabanı oluşturulamadı (DB: %s, User: %s, Privileges: %s)',
                     $databaseCreated ? 'OK' : 'FAIL',
                     $userCreated ? 'OK' : 'FAIL',
                     $privilegesGranted ? 'OK' : 'FAIL'

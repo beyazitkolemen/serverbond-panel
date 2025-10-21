@@ -35,19 +35,19 @@ try {
 
     // Create user
     echo "  → Creating test user: {$testUser}...\n";
-    $userCreated = $db->statement("CREATE USER IF NOT EXISTS '{$testUser}'@'localhost' IDENTIFIED BY '{$testPass}'");
+    $userCreated = $db->statement("CREATE USER IF NOT EXISTS '{$testUser}'@'%' IDENTIFIED BY '{$testPass}'");
     echo "    " . ($userCreated ? "✓" : "✗") . " User creation\n";
-
+    
     // Grant privileges
     echo "  → Granting privileges...\n";
-    $granted = $db->statement("GRANT ALL PRIVILEGES ON `{$testDb}`.* TO '{$testUser}'@'localhost'");
+    $granted = $db->statement("GRANT ALL PRIVILEGES ON `{$testDb}`.* TO '{$testUser}'@'%'");
     $flushed = $db->statement("FLUSH PRIVILEGES");
     echo "    " . ($granted && $flushed ? "✓" : "✗") . " Privileges granted\n";
-
+    
     // Cleanup
     echo "  → Cleaning up test data...\n";
     $db->statement("DROP DATABASE IF EXISTS `{$testDb}`");
-    $db->statement("DROP USER IF EXISTS '{$testUser}'@'localhost'");
+    $db->statement("DROP USER IF EXISTS '{$testUser}'@'%'");
     $db->statement("FLUSH PRIVILEGES");
     echo "    ✓ Cleanup completed\n\n";
 

@@ -38,19 +38,19 @@ class TestMySQLConnection extends Command
 
             $dbCreated = DB::statement("CREATE DATABASE IF NOT EXISTS `{$testDb}`");
             $this->line('  ' . ($dbCreated ? '✓' : '✗') . ' CREATE DATABASE');
-
-            $userCreated = DB::statement("CREATE USER IF NOT EXISTS '{$testUser}'@'localhost' IDENTIFIED BY '{$testPass}'");
+            
+            $userCreated = DB::statement("CREATE USER IF NOT EXISTS '{$testUser}'@'%' IDENTIFIED BY '{$testPass}'");
             $this->line('  ' . ($userCreated ? '✓' : '✗') . ' CREATE USER');
-
-            $granted = DB::statement("GRANT ALL PRIVILEGES ON `{$testDb}`.* TO '{$testUser}'@'localhost'");
+            
+            $granted = DB::statement("GRANT ALL PRIVILEGES ON `{$testDb}`.* TO '{$testUser}'@'%'");
             $this->line('  ' . ($granted ? '✓' : '✗') . ' GRANT PRIVILEGES');
-
+            
             DB::statement("FLUSH PRIVILEGES");
             $this->line('  ✓ FLUSH PRIVILEGES');
-
+            
             // Cleanup
             DB::statement("DROP DATABASE IF EXISTS `{$testDb}`");
-            DB::statement("DROP USER IF EXISTS '{$testUser}'@'localhost'");
+            DB::statement("DROP USER IF EXISTS '{$testUser}'@'%'");
             $this->line('  ✓ Cleanup completed');
 
             $this->newLine();

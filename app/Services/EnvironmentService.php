@@ -152,25 +152,31 @@ class EnvironmentService
 
         // Database bilgileri var mı kontrol et
         if (empty($credentials['database']) || empty($credentials['username'])) {
-            \Log::warning('EnvironmentService: Database config skipped - missing credentials', [
-                'database_empty' => empty($credentials['database']),
-                'username_empty' => empty($credentials['username']),
-            ]);
+            \Log::warning('EnvironmentService: Database config skipped - missing credentials');
             return $envContent;
         }
 
-        // Password kontrolü
-        if (empty($credentials['password'])) {
-            \Log::error('EnvironmentService: Password is empty!');
-        }
+        // Database config replacements
+        $replacements = [
+            '/^DB_CONNECTION=.*$/m'     => 'DB_CONNECTION=' . $credentials['connection'],
+            '/^#\s*DB_HOST=.*$/m'       => 'DB_HOST=' . $credentials['host'],
+            '/^DB_HOST=.*$/m'           => 'DB_HOST=' . $credentials['host'],
+            '/^#\s*DB_PORT=.*$/m'       => 'DB_PORT=' . $credentials['port'],
+            '/^DB_PORT=.*$/m'           => 'DB_PORT=' . $credentials['port'],
+            '/^#\s*DB_DATABASE=.*$/m'   => 'DB_DATABASE=' . $credentials['database'],
+            '/^DB_DATABASE=.*$/m'       => 'DB_DATABASE=' . $credentials['database'],
+            '/^#\s*DB_USERNAME=.*$/m'   => 'DB_USERNAME=' . $credentials['username'],
+            '/^DB_USERNAME=.*$/m'       => 'DB_USERNAME=' . $credentials['username'],
+            '/^#\s*DB_PASSWORD=.*$/m'   => 'DB_PASSWORD=' . ($credentials['password'] ?? ''),
+            '/^DB_PASSWORD=.*$/m'       => 'DB_PASSWORD=' . ($credentials['password'] ?? ''),
+        ];
 
-        // Her bir değeri tek tek yaz ve log tut
-        $envContent = $this->setEnvValue($envContent, 'DB_CONNECTION', $credentials['connection']);
-        $envContent = $this->setEnvValue($envContent, 'DB_HOST', $credentials['host']);
-        $envContent = $this->setEnvValue($envContent, 'DB_PORT', (string) $credentials['port']);
-        $envContent = $this->setEnvValue($envContent, 'DB_DATABASE', $credentials['database']);
-        $envContent = $this->setEnvValue($envContent, 'DB_USERNAME', $credentials['username']);
-        $envContent = $this->setEnvValue($envContent, 'DB_PASSWORD', $credentials['password'] ?? '');
+        foreach ($replacements as $pattern => $replacement) {
+            if (preg_match($pattern, $envContent)) {
+                $envContent = (string) preg_replace($pattern, $replacement, $envContent);
+                \Log::debug("ENV: Applied replacement", ['pattern' => $pattern, 'replacement' => $replacement]);
+            }
+        }
 
         \Log::info('EnvironmentService: Database config applied successfully');
 
@@ -180,50 +186,35 @@ class EnvironmentService
     private function setEnvValue(string $content, string $key, string $value): string
     {
         $normalizedValue = $this->normalizeEnvValue($value);
+        $escapedKey = preg_quote($key, '/');
 
         // Pattern 1: Aktif key (DB_HOST=value)
-        $activePattern = '/^[\s]*' . preg_quote($key, '/') . '[\s]*=.*$/m';
+        $activePattern = '/^' . $escapedKey . '=.*$/m';
 
-        // Pattern 2: Comment'li key (# DB_HOST=value)
-        $commentPattern = '/^[\s]*#[\s]*' . preg_quote($key, '/') . '[\s]*=.*$/m';
+        // Pattern 2: Comment'li key (# DB_HOST=value veya #DB_HOST=value)
+        $commentPattern = '/^#\s*' . $escapedKey . '=.*$/m';
 
         // Aktif key varsa değiştir
-        if (preg_match($activePattern, $content) === 1) {
+        if (preg_match($activePattern, $content)) {
             $replaced = (string) preg_replace($activePattern, $key . '=' . $normalizedValue, $content);
-            \Log::debug("ENV: Updated {$key}", ['value' => $normalizedValue]);
+            \Log::debug("ENV: Updated active {$key} = {$normalizedValue}");
             return $replaced;
         }
 
         // Comment'li key varsa, uncomment et ve değiştir
-        if (preg_match($commentPattern, $content) === 1) {
+        if (preg_match($commentPattern, $content)) {
             $replaced = (string) preg_replace($commentPattern, $key . '=' . $normalizedValue, $content);
-            \Log::debug("ENV: Uncommented and updated {$key}", ['value' => $normalizedValue]);
+            \Log::debug("ENV: Uncommented {$key} = {$normalizedValue}");
             return $replaced;
         }
 
-        // Key hiç yoksa - DB_ ile başlayan section'ı bul ve orada ekle
-        if (str_starts_with($key, 'DB_')) {
-            // DB_CONNECTION'dan sonra, ilk boş satırdan önce ekle
-            $dbSectionPattern = '/(DB_CONNECTION\s*=.*?)(\n)(?=\n|$)/s';
-
-            if (preg_match($dbSectionPattern, $content)) {
-                $replacement = "$1\n" . $key . '=' . $normalizedValue . "$2";
-                $newContent = preg_replace($dbSectionPattern, $replacement, $content, 1);
-
-                if ($newContent !== null && $newContent !== $content) {
-                    \Log::debug("ENV: Added {$key} after DB_CONNECTION");
-                    return $newContent;
-                }
-            }
-        }
-
-        // Hiçbir yerde bulunamadıysa sona ekle
+        // Key hiç yoksa sona ekle
         $content = rtrim($content);
         if ($content !== '') {
             $content .= PHP_EOL;
         }
 
-        \Log::debug("ENV: Added {$key} to end");
+        \Log::debug("ENV: Added new {$key} = {$normalizedValue}");
         return $content . $key . '=' . $normalizedValue . PHP_EOL;
     }
 
