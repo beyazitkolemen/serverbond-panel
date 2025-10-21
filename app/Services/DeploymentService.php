@@ -51,14 +51,30 @@ class DeploymentService
 
         // 1. Clone or pull repository
         if ($site->git_repository) {
+            // Üst dizini oluştur (eğer yoksa)
+            $parentDirectory = dirname($rootPath);
+            if (!File::exists($parentDirectory)) {
+                $output[] = "Creating parent directory: {$parentDirectory}";
+                File::makeDirectory($parentDirectory, 0755, true);
+            }
+
             if (!File::exists($rootPath)) {
                 $output[] = "Cloning repository...";
-                $result = Process::path(dirname($rootPath))
-                    ->run("git clone -b {$site->git_branch} {$site->git_repository} {$site->domain}");
+
+                // Önce dizini oluştur
+                File::makeDirectory($rootPath, 0755, true);
+
+                // Git clone yap
+                $result = Process::path($rootPath)
+                    ->run("git clone -b {$site->git_branch} {$site->git_repository} .");
 
                 $output[] = $result->output();
 
                 if (!$result->successful()) {
+                    // Hata varsa oluşturduğumuz dizini temizle
+                    if (File::exists($rootPath)) {
+                        File::deleteDirectory($rootPath);
+                    }
                     throw new \Exception("Git clone failed: " . $result->errorOutput());
                 }
             } else {
