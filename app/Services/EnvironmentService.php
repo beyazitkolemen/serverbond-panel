@@ -18,10 +18,19 @@ class EnvironmentService
     {
         File::ensureDirectoryExists($rootPath);
 
+        // Önce database provision et
         $credentials = $this->provisionDatabase($site, $outputCallback);
+
+        // Site'yi refresh et (database bilgileri güncellenmiş olabilir)
+        $site->refresh();
+
+        // Base content al
         $envContent = $this->resolveBaseEnvironmentContent($site, $rootPath, $outputCallback);
+
+        // Database config uygula
         $envContent = $this->applyDatabaseConfiguration($envContent, $credentials);
 
+        // .env dosyasına yaz
         File::put($rootPath . '/.env', $envContent);
 
         $this->notify($outputCallback, '.env file synchronized successfully.');
@@ -69,8 +78,6 @@ class EnvironmentService
 
             // Site'den oku - plain text şifre
             $password = $site->database_password;
-
-            $this->notify($outputCallback, sprintf('Retrieved password length: %d', strlen($password)));
 
             return [
                 'connection' => config('deployment.database.connection'),
@@ -121,22 +128,16 @@ class EnvironmentService
     {
         // Sadece database bilgileri varsa yaz
         if (!empty($credentials['database']) && !empty($credentials['username'])) {
-            $this->notify(null, sprintf('Applying database config - DB: %s, User: %s, Pass: %s',
-                $credentials['database'],
-                $credentials['username'],
-                !empty($credentials['password']) ? '[SET]' : '[EMPTY]'
-            ));
-
             $envContent = $this->setEnvValue($envContent, 'DB_CONNECTION', $credentials['connection']);
             $envContent = $this->setEnvValue($envContent, 'DB_HOST', $credentials['host']);
             $envContent = $this->setEnvValue($envContent, 'DB_PORT', (string) $credentials['port']);
             $envContent = $this->setEnvValue($envContent, 'DB_DATABASE', $credentials['database']);
             $envContent = $this->setEnvValue($envContent, 'DB_USERNAME', $credentials['username']);
             $envContent = $this->setEnvValue($envContent, 'DB_PASSWORD', $credentials['password'] ?? '');
-        } else {
-            $this->notify(null, sprintf('Database config skipped - DB: %s, User: %s',
-                $credentials['database'] ?? 'empty',
-                $credentials['username'] ?? 'empty'
+
+            $this->notify($outputCallback ?? null, sprintf('Database configured: %s@%s',
+                $credentials['username'],
+                $credentials['database']
             ));
         }
 
@@ -146,12 +147,35 @@ class EnvironmentService
     private function setEnvValue(string $content, string $key, string $value): string
     {
         $normalizedValue = $this->normalizeEnvValue($value);
-        $pattern = '/^' . preg_quote($key, '/') . '=.*/m';
 
+        // Daha esnek pattern - boşluk, comment vb. yakalar
+        // Satır başında optional whitespace + key + optional whitespace + = + herhangi bir şey
+        $pattern = '/^[\s]*' . preg_quote($key, '/') . '[\s]*=.*$/m';
+
+        // Eğer key mevcutsa değiştir
         if (preg_match($pattern, $content) === 1) {
-            return (string) preg_replace($pattern, $key . '=' . $normalizedValue, $content);
+            // Değiştirirken clean format kullan (boşluksuz)
+            $replaced = (string) preg_replace($pattern, $key . '=' . $normalizedValue, $content);
+            return $replaced;
         }
 
+        // Key yoksa - DB_ ile başlayan section'ı bul ve orada ekle
+        if (str_starts_with($key, 'DB_')) {
+            // DB section'ını bul
+            $dbSectionPattern = '/(DB_[A-Z_]+\s*=.*?)(\n\s*\n)/s';
+
+            if (preg_match($dbSectionPattern, $content)) {
+                // DB section'ı sonuna ekle
+                $replacement = "$1\n" . $key . '=' . $normalizedValue . "$2";
+                $newContent = preg_replace($dbSectionPattern, $replacement, $content, 1);
+
+                if ($newContent !== null && $newContent !== $content) {
+                    return $newContent;
+                }
+            }
+        }
+
+        // Hiçbir yerde bulunamadıysa sona ekle
         $content = rtrim($content);
         if ($content !== '') {
             $content .= PHP_EOL;

@@ -67,51 +67,61 @@ class MySQLService
     public function createDatabaseForSite(Site $site): array
     {
         try {
-            // Database bilgilerini al veya oluştur
-            $needsNewDatabase = empty($site->database_name);
-            $needsNewUser = empty($site->database_user);
-            $needsNewPassword = empty($site->database_password);
+            // Site'de zaten database bilgileri var mı kontrol et
+            $hasCredentials = !empty($site->database_name)
+                && !empty($site->database_user)
+                && !empty($site->database_password);
 
-            $dbName = $site->database_name ?: 'db_' . Str::slug($site->domain, '_');
-            $dbUser = $site->database_user ?: 'user_' . Str::slug($site->domain, '_');
+            if ($hasCredentials) {
+                // Mevcut bilgileri kullan (plain text)
+                $dbName = $this->normalizeIdentifier($site->database_name);
+                $dbUser = $this->normalizeIdentifier($site->database_user);
+                $dbPassword = $site->database_password; // Plain text
 
-            // Şifre - site'de varsa onu kullan, yoksa yeni oluştur
-            $dbPassword = $needsNewPassword
-                ? Str::random(32)
-                : $site->database_password; // Plain text
+                \Log::info('MySQLService: Using existing credentials', [
+                    'db' => $dbName,
+                    'user' => $dbUser,
+                    'pass_length' => strlen($dbPassword),
+                ]);
+            } else {
+                // Yeni bilgiler oluştur
+                $slug = Str::slug($site->domain, '_');
+                $dbName = $this->normalizeIdentifier('sb_' . $slug . '_db');
+                $dbUser = $this->normalizeIdentifier('sb_' . $slug . '_user');
+                $dbPassword = Str::random(32);
 
-            $dbName = $this->normalizeIdentifier($dbName);
-            $dbUser = $this->normalizeIdentifier($dbUser);
+                \Log::info('MySQLService: Generated new credentials', [
+                    'db' => $dbName,
+                    'user' => $dbUser,
+                    'pass_length' => strlen($dbPassword),
+                ]);
+            }
 
-            // Database ve user oluştur (IF NOT EXISTS kullanıldığı için güvenli)
+            // MySQL'de database, user ve privileges oluştur (IF NOT EXISTS - idempotent)
             $databaseCreated = $this->createDatabase($dbName);
             $userCreated = $this->createUser($dbUser, $dbPassword);
             $privilegesGranted = $this->grantPrivileges($dbName, $dbUser);
 
             if ($databaseCreated && $userCreated && $privilegesGranted) {
-                // Sadece eksik olan bilgileri kaydet
-                $updates = [];
+                // Yeni oluşturduysak site'ye kaydet
+                if (!$hasCredentials) {
+                    $site->update([
+                        'database_name' => $dbName,
+                        'database_user' => $dbUser,
+                        'database_password' => $dbPassword, // Plain text
+                    ]);
 
-                if ($needsNewDatabase) {
-                    $updates['database_name'] = $dbName;
-                }
-                if ($needsNewUser) {
-                    $updates['database_user'] = $dbUser;
-                }
-                if ($needsNewPassword) {
-                    $updates['database_password'] = $dbPassword; // Plain text olarak kaydet
-                }
-
-                if (!empty($updates)) {
-                    $site->update($updates);
+                    \Log::info('MySQLService: Saved credentials to site', [
+                        'site_id' => $site->id,
+                    ]);
                 }
 
-                // Kullanılan şifreyi döndür (plain text - .env için)
+                // Kullanılan bilgileri döndür (MySQL ve .env için AYNI)
                 return [
                     'success' => true,
                     'database' => $dbName,
                     'user' => $dbUser,
-                    'password' => $dbPassword, // MySQL'de kullanılan plain text şifre
+                    'password' => $dbPassword, // Plain text
                 ];
             }
 

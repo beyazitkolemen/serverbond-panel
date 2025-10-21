@@ -157,6 +157,10 @@ class Site extends Model
 
     protected function getLaravelEnvTemplate(): string
     {
+        $dbName = $this->database_name ?? '';
+        $dbUser = $this->database_user ?? '';
+        $dbPassword = $this->database_password ?? '';
+
         return <<<ENV
 APP_NAME={$this->name}
 APP_ENV=production
@@ -170,9 +174,9 @@ LOG_LEVEL=error
 DB_CONNECTION=mysql
 DB_HOST=127.0.0.1
 DB_PORT=3306
-DB_DATABASE={$this->database_name}
-DB_USERNAME={$this->database_user}
-DB_PASSWORD={$this->database_password}
+DB_DATABASE={$dbName}
+DB_USERNAME={$dbUser}
+DB_PASSWORD={$dbPassword}
 
 BROADCAST_DRIVER=log
 CACHE_DRIVER=redis
@@ -198,6 +202,10 @@ ENV;
 
     protected function getPhpEnvTemplate(): string
     {
+        $dbName = $this->database_name ?? '';
+        $dbUser = $this->database_user ?? '';
+        $dbPassword = $this->database_password ?? '';
+
         return <<<ENV
 APP_NAME={$this->name}
 APP_ENV=production
@@ -206,14 +214,18 @@ APP_URL=https://{$this->domain}
 
 DB_HOST=127.0.0.1
 DB_PORT=3306
-DB_DATABASE={$this->database_name}
-DB_USERNAME={$this->database_user}
-DB_PASSWORD={$this->database_password}
+DB_DATABASE={$dbName}
+DB_USERNAME={$dbUser}
+DB_PASSWORD={$dbPassword}
 ENV;
     }
 
     protected function getNodeEnvTemplate(): string
     {
+        $dbName = $this->database_name ?? '';
+        $dbUser = $this->database_user ?? '';
+        $dbPassword = $this->database_password ?? '';
+
         return <<<ENV
 NODE_ENV=production
 APP_NAME={$this->name}
@@ -222,22 +234,26 @@ PORT=3000
 
 DB_HOST=127.0.0.1
 DB_PORT=3306
-DB_DATABASE={$this->database_name}
-DB_USERNAME={$this->database_user}
-DB_PASSWORD={$this->database_password}
+DB_DATABASE={$dbName}
+DB_USERNAME={$dbUser}
+DB_PASSWORD={$dbPassword}
 ENV;
     }
 
     protected function getPythonEnvTemplate(): string
     {
+        $dbName = $this->database_name ?? '';
+        $dbUser = $this->database_user ?? '';
+        $dbPassword = $this->database_password ?? '';
+
         return <<<ENV
 DEBUG=False
 SECRET_KEY=
 ALLOWED_HOSTS={$this->domain},www.{$this->domain}
 
-DATABASE_NAME={$this->database_name}
-DATABASE_USER={$this->database_user}
-DATABASE_PASSWORD={$this->database_password}
+DATABASE_NAME={$dbName}
+DATABASE_USER={$dbUser}
+DATABASE_PASSWORD={$dbPassword}
 DATABASE_HOST=127.0.0.1
 DATABASE_PORT=3306
 ENV;
