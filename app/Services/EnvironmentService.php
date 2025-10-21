@@ -51,9 +51,9 @@ class EnvironmentService
             );
 
             return [
-                'connection' => 'mysql',
-                'host' => '127.0.0.1',
-                'port' => '3306',
+                'connection' => config('deployment.database.connection'),
+                'host' => config('deployment.database.host'),
+                'port' => config('deployment.database.port'),
                 'database' => $result['database'],
                 'username' => $result['user'],
                 'password' => $result['password'],
@@ -64,9 +64,9 @@ class EnvironmentService
             $this->notify($outputCallback, 'Using existing database credentials stored for the site.');
 
             return [
-                'connection' => 'mysql',
-                'host' => '127.0.0.1',
-                'port' => '3306',
+                'connection' => config('deployment.database.connection'),
+                'host' => config('deployment.database.host'),
+                'port' => config('deployment.database.port'),
                 'database' => $site->database_name,
                 'username' => $site->database_user,
                 'password' => $site->database_password,

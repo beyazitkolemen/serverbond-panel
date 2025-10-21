@@ -10,8 +10,14 @@ use Illuminate\Support\Facades\Process;
 
 class NginxService
 {
-    protected string $sitesAvailable = '/etc/nginx/sites-available';
-    protected string $sitesEnabled = '/etc/nginx/sites-enabled';
+    protected string $sitesAvailable;
+    protected string $sitesEnabled;
+
+    public function __construct()
+    {
+        $this->sitesAvailable = config('deployment.nginx.sites_available');
+        $this->sitesEnabled = config('deployment.nginx.sites_enabled');
+    }
 
     public function generateConfig(Site $site): string
     {
@@ -31,7 +37,7 @@ class NginxService
 
     protected function generateLaravelConfig(Site $site, string $rootPath, string $publicPath): string
     {
-        $phpVersion = $site->php_version ?: '8.4';
+        $phpVersion = $site->php_version ?: config('deployment.nginx.default_php_version');
 
         return <<<NGINX
 server {
@@ -72,7 +78,7 @@ NGINX;
 
     protected function generatePHPConfig(Site $site, string $rootPath, string $publicPath): string
     {
-        $phpVersion = $site->php_version ?: '8.4';
+        $phpVersion = $site->php_version ?: config('deployment.nginx.default_php_version');
 
         return <<<NGINX
 server {
@@ -124,7 +130,7 @@ NGINX;
 
     protected function generateNodeJSConfig(Site $site, string $rootPath): string
     {
-        $port = 3000; // Default Node.js port, bu dinamik olabilir
+        $port = config('deployment.ports.nodejs');
 
         return <<<NGINX
 server {
@@ -149,7 +155,7 @@ NGINX;
 
     protected function generatePythonConfig(Site $site, string $rootPath): string
     {
-        $port = 8000; // Default Python port
+        $port = config('deployment.ports.python');
 
         return <<<NGINX
 server {

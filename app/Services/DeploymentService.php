@@ -90,17 +90,17 @@ class DeploymentService
     protected function runDeploymentScript(Site $site, string $rootPath, array &$output): void
     {
         // Create temporary script file
-        $scriptPath = $rootPath . '/deploy-script.sh';
+        $scriptPath = $rootPath . '/' . config('deployment.paths.script_name');
         File::put($scriptPath, $site->deployment_script);
 
         // Make script executable
-        chmod($scriptPath, 0755);
+        chmod($scriptPath, config('deployment.script_permissions'));
 
         try {
             // Run the deployment script
             $result = Process::path($rootPath)
-                ->timeout(600)
-                ->run('bash deploy-script.sh');
+                ->timeout(config('deployment.timeout'))
+                ->run('bash ' . config('deployment.paths.script_name'));
 
             $this->captureProcessStreams($result, $output);
 
@@ -120,12 +120,12 @@ class DeploymentService
         $parentDirectory = dirname($rootPath);
 
         if (!File::exists($parentDirectory)) {
-            File::makeDirectory($parentDirectory, 0755, true);
+            File::makeDirectory($parentDirectory, config('deployment.directory_permissions'), true);
             $this->appendOutput($output, "Creating parent directory: {$parentDirectory}");
         }
 
         if (!File::exists($rootPath)) {
-            File::makeDirectory($rootPath, 0755, true);
+            File::makeDirectory($rootPath, config('deployment.directory_permissions'), true);
             $this->appendOutput($output, "Preparing site directory: {$rootPath}");
         }
 
@@ -259,11 +259,11 @@ class DeploymentService
         $deployKeyPath = null;
 
         if ($site->git_deploy_key) {
-            $deployKeyPath = storage_path('app/deploy-keys/deploy-key-' . $site->id . '-' . Str::random(16));
+            $deployKeyPath = config('deployment.paths.deploy_keys') . '/deploy-key-' . $site->id . '-' . Str::random(16);
 
             File::ensureDirectoryExists(dirname($deployKeyPath));
             File::put($deployKeyPath, $site->git_deploy_key);
-            chmod($deployKeyPath, 0600);
+            chmod($deployKeyPath, config('deployment.deploy_key_permissions'));
 
             $environment['GIT_SSH_COMMAND'] = sprintf(
                 'ssh -i %s -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null',
@@ -296,6 +296,6 @@ class DeploymentService
     {
         $branch = trim((string) $site->git_branch);
 
-        return $branch !== '' ? $branch : 'main';
+        return $branch !== '' ? $branch : config('deployment.git.default_branch');
     }
 }

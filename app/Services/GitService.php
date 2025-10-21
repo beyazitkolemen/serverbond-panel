@@ -13,7 +13,7 @@ class GitService
     {
         // Repository URL'i boşsa varsayılan dön
         if (empty($repositoryUrl)) {
-            return 'main';
+            return config('deployment.git.default_branch');
         }
 
         // GitHub, GitLab, Bitbucket gibi servislerde API ile branch bilgisini çek
@@ -22,7 +22,7 @@ class GitService
             $parsedUrl = $this->parseGitUrl($repositoryUrl);
 
             if (!$parsedUrl) {
-                return 'main';
+                return config('deployment.git.default_branch');
             }
 
             // GitHub için API kontrolü
@@ -53,10 +53,10 @@ class GitService
                 'error' => $e->getMessage(),
             ]);
 
-            return 'main';
+            return config('deployment.git.default_branch');
         }
 
-        return 'main';
+        return config('deployment.git.default_branch');
     }
 
     /**
@@ -95,8 +95,8 @@ class GitService
             $context = stream_context_create([
                 'http' => [
                     'method' => 'GET',
-                    'header' => "User-Agent: ServerBond\r\n",
-                    'timeout' => 3,
+                    'header' => "User-Agent: " . config('deployment.git.user_agent') . "\r\n",
+                    'timeout' => config('deployment.git.api_timeout'),
                 ],
             ]);
 
@@ -132,8 +132,8 @@ class GitService
             $context = stream_context_create([
                 'http' => [
                     'method' => 'GET',
-                    'header' => "User-Agent: ServerBond\r\n",
-                    'timeout' => 3,
+                    'header' => "User-Agent: " . config('deployment.git.user_agent') . "\r\n",
+                    'timeout' => config('deployment.git.api_timeout'),
                 ],
             ]);
 
