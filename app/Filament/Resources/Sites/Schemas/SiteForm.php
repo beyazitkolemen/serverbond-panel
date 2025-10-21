@@ -251,7 +251,6 @@ class SiteForm
                                     ->schema([
                                         CodeEditor::make('env_content')
                                             ->label('.env Dosyası')
-                                            ->minHeight(500)
                                             ->helperText('Site deploy edildikten sonra .env dosyası otomatik oluşturulur veya güncellenir.')
                                             ->placeholder('APP_NAME=Laravel
 APP_ENV=production
