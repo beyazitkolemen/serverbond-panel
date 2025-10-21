@@ -16,8 +16,7 @@ class MySQLService
 {
     public function __construct(
         private readonly DatabaseManager $databaseManager,
-    ) {
-    }
+    ) {}
 
     public function createDatabase(string $databaseName): bool
     {
@@ -231,5 +230,114 @@ class MySQLService
             return $encrypted;
         }
     }
-}
 
+    /**
+     * Tüm database'leri listele
+     */
+    public function listDatabases(): array
+    {
+        try {
+            $databases = $this->connection()
+                ->select('SHOW DATABASES');
+
+            // System database'lerini filtrele
+            $systemDatabases = ['information_schema', 'mysql', 'performance_schema', 'sys'];
+
+            return collect($databases)
+                ->pluck('Database')
+                ->reject(fn($db) => in_array($db, $systemDatabases))
+                ->values()
+                ->all();
+        } catch (Throwable $e) {
+            \Log::error('Failed to list databases', ['error' => $e->getMessage()]);
+            return [];
+        }
+    }
+
+    /**
+     * Tüm MySQL kullanıcılarını listele
+     */
+    public function listUsers(): array
+    {
+        try {
+            $users = $this->connection()
+                ->select("SELECT User, Host FROM mysql.user WHERE User != '' AND User NOT IN ('root', 'mysql.sys', 'mysql.session', 'mysql.infoschema')");
+
+            return collect($users)
+                ->map(fn($user) => [
+                    'username' => $user->User,
+                    'host' => $user->Host,
+                ])
+                ->all();
+        } catch (Throwable $e) {
+            \Log::error('Failed to list users', ['error' => $e->getMessage()]);
+            return [];
+        }
+    }
+
+    /**
+     * Database bilgilerini al
+     */
+    public function getDatabaseInfo(string $databaseName): ?array
+    {
+        try {
+            $info = $this->connection()
+                ->select("SELECT 
+                    SCHEMA_NAME as name,
+                    DEFAULT_CHARACTER_SET_NAME as charset,
+                    DEFAULT_COLLATION_NAME as collation
+                FROM information_schema.SCHEMATA 
+                WHERE SCHEMA_NAME = ?", [$databaseName]);
+
+            return $info ? (array) $info[0] : null;
+        } catch (Throwable $e) {
+            \Log::error('Failed to get database info', ['error' => $e->getMessage()]);
+            return null;
+        }
+    }
+
+    /**
+     * MySQL'deki database'leri sync et
+     */
+    public function syncDatabases(): array
+    {
+        $databases = $this->listDatabases();
+        $synced = [];
+        $skipped = [];
+
+        foreach ($databases as $dbName) {
+            // Panel'de zaten var mı kontrol et
+            $existing = \App\Models\Database::where('name', $dbName)->first();
+
+            if ($existing) {
+                $skipped[] = $dbName;
+                continue;
+            }
+
+            // Database bilgilerini al
+            $info = $this->getDatabaseInfo($dbName);
+
+            if (!$info) {
+                continue;
+            }
+
+            // Panel'e kaydet
+            \App\Models\Database::create([
+                'name' => $dbName,
+                'username' => $dbName, // Varsayılan olarak database adı
+                'password' => Str::random(16), // Güvenli şifre
+                'charset' => $info['charset'] ?? 'utf8mb4',
+                'collation' => $info['collation'] ?? 'utf8mb4_unicode_ci',
+                'notes' => 'MySQL sync ile otomatik eklendi',
+            ]);
+
+            $synced[] = $dbName;
+        }
+
+        return [
+            'synced' => $synced,
+            'skipped' => $skipped,
+            'total' => count($databases),
+        ];
+    }
+}
