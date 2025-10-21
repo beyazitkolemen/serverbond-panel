@@ -31,28 +31,44 @@ class DeploymentScriptService
 #!/bin/bash
 set -e
 
+echo "🚀 Laravel Deployment Started"
+
 # Composer
-composer install --no-dev --optimize-autoloader --no-interaction
+echo "📦 Installing dependencies..."
+if [ -f "composer.lock" ]; then
+    echo "✓ composer.lock found, installing from lock file"
+    composer install --no-dev --optimize-autoloader --no-interaction
+else
+    echo "⚠ composer.lock not found, updating dependencies"
+    composer update --no-dev --optimize-autoloader --no-interaction
+fi
 
 # Cache
+echo "🗑️ Clearing caches..."
 php artisan config:clear
 php artisan cache:clear
 php artisan route:clear
 php artisan view:clear
 
 # Database
+echo "🗄️ Running migrations..."
 php artisan migrate --force
 
 # Optimize
+echo "⚡ Optimizing application..."
 php artisan config:cache
 php artisan route:cache
 php artisan view:cache
 
 # Storage
-php artisan storage:link
+echo "🔗 Linking storage..."
+php artisan storage:link || echo "⚠ Storage link already exists"
 
 # Permissions
+echo "🔐 Setting permissions..."
 chmod -R 775 storage bootstrap/cache
+
+echo "✅ Deployment completed successfully!"
 BASH;
     }
 
@@ -65,14 +81,24 @@ BASH;
 #!/bin/bash
 set -e
 
+echo "🚀 PHP Deployment Started"
+
 # Composer (if exists)
 if [ -f "composer.json" ]; then
-    composer install --no-dev --optimize-autoloader --no-interaction
+    echo "📦 Installing composer dependencies..."
+    if [ -f "composer.lock" ]; then
+        composer install --no-dev --optimize-autoloader --no-interaction
+    else
+        composer update --no-dev --optimize-autoloader --no-interaction
+    fi
 fi
 
 # Permissions
+echo "🔐 Setting permissions..."
 find . -type f -exec chmod 644 {} \;
 find . -type d -exec chmod 755 {} \;
+
+echo "✅ Deployment completed successfully!"
 BASH;
     }
 
@@ -85,15 +111,22 @@ BASH;
 #!/bin/bash
 set -e
 
+echo "🚀 Static Site Deployment Started"
+
 # NPM (if exists)
 if [ -f "package.json" ]; then
-    npm ci
+    echo "📦 Installing npm dependencies..."
+    npm ci || npm install
+    echo "🔨 Building assets..."
     npm run build
 fi
 
 # Permissions
+echo "🔐 Setting permissions..."
 find . -type f -exec chmod 644 {} \;
 find . -type d -exec chmod 755 {} \;
+
+echo "✅ Deployment completed successfully!"
 BASH;
     }
 
@@ -106,11 +139,17 @@ BASH;
 #!/bin/bash
 set -e
 
+echo "🚀 Node.js Deployment Started"
+
 # NPM
-npm ci --production
+echo "📦 Installing npm dependencies..."
+npm ci --production || npm install --production
 
 # PM2 restart
+echo "🔄 Restarting application..."
 pm2 restart ecosystem.config.js --update-env || pm2 start ecosystem.config.js
+
+echo "✅ Deployment completed successfully!"
 BASH;
     }
 
@@ -123,23 +162,32 @@ BASH;
 #!/bin/bash
 set -e
 
+echo "🚀 Python Deployment Started"
+
 # Virtual Environment
 if [ ! -d "venv" ]; then
+    echo "🐍 Creating virtual environment..."
     python3 -m venv venv
 fi
 source venv/bin/activate
 
 # Dependencies
+echo "📦 Installing pip dependencies..."
 pip install -r requirements.txt
 
 # Django (if exists)
 if [ -f "manage.py" ]; then
+    echo "🗄️ Running migrations..."
     python manage.py migrate --noinput
+    echo "📁 Collecting static files..."
     python manage.py collectstatic --noinput
 fi
 
 # Restart
+echo "🔄 Restarting application..."
 sudo systemctl restart gunicorn || true
+
+echo "✅ Deployment completed successfully!"
 BASH;
     }
 
