@@ -162,39 +162,7 @@ class SitesTable
                     })
                     ->visible(fn ($record) => $record->git_repository),
 
-                Action::make('createDatabase')
-                    ->label('Database Oluştur')
-                    ->icon('heroicon-o-circle-stack')
-                    ->color('info')
-                    ->requiresConfirmation()
-                    ->action(function ($record) {
-                        $mysqlService = app(MySQLService::class);
 
-                        try {
-                            $result = $mysqlService->createDatabaseForSite($record);
-
-                            if ($result['success']) {
-                                Notification::make()
-                                    ->title('Database Oluşturuldu')
-                                    ->success()
-                                    ->body("Database: {$result['database']}, User: {$result['user']}")
-                                    ->send();
-                            } else {
-                                Notification::make()
-                                    ->title('Database Hatası')
-                                    ->danger()
-                                    ->body($result['error'] ?? 'Veritabanı oluşturulamadı.')
-                                    ->send();
-                            }
-                        } catch (Throwable $e) {
-                            Notification::make()
-                                ->title('Database Hatası')
-                                ->danger()
-                                ->body($e->getMessage())
-                                ->send();
-                        }
-                    })
-                    ->visible(fn ($record) => !$record->database_name),
 
                 Action::make('configureNginx')
                     ->label('Nginx Yapılandır')

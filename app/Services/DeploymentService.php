@@ -7,309 +7,229 @@ namespace App\Services;
 use App\Enums\DeploymentStatus;
 use App\Enums\DeploymentTrigger;
 use App\Enums\SiteStatus;
+use App\Models\Database;
 use App\Models\Deployment;
+use App\Models\DeploymentLog;
 use App\Models\Site;
-use App\Services\CloudflareService;
-use App\Services\EnvironmentService;
 use Illuminate\Process\ProcessResult;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Str;
+use RuntimeException;
 use Throwable;
 
 class DeploymentService
 {
     public function __construct(
+        private readonly MySQLService $mySQLService,
         private readonly EnvironmentService $environmentService,
         private readonly CloudflareService $cloudflareService,
     ) {}
 
     public function deploy(Site $site, DeploymentTrigger $trigger = DeploymentTrigger::Manual, ?int $userId = null): Deployment
     {
-        $deployment = Deployment::create([
-            'site_id' => $site->id,
-            'user_id' => $userId,
-            'status' => DeploymentStatus::Pending,
-            'trigger' => $trigger,
-            'started_at' => now(),
-        ]);
-
-        $site->update(['status' => SiteStatus::Deploying]);
-
+        $deployment = $this->initializeDeployment($site, $trigger, $userId);
         $output = [];
 
         try {
             $deployment->update(['status' => DeploymentStatus::Running]);
+            $this->logDeployment($site, $deployment, 'info', 'Deployment başlatıldı');
 
-            $this->runDeployment($site, $deployment, $output);
+            $this->executeDeployment($site, $deployment, $output);
 
-            $deployment->update([
-                'status' => DeploymentStatus::Success,
-                'output' => $this->formatOutput($output),
-                'finished_at' => now(),
-                'duration' => now()->diffInSeconds($deployment->started_at),
-            ]);
-
-            $site->update([
-                'status' => SiteStatus::Active,
-                'last_deployed_at' => now(),
-            ]);
+            $this->finalizeSuccessfulDeployment($deployment, $site, $output);
+            $this->logDeployment($site, $deployment, 'success', 'Deployment başarıyla tamamlandı');
         } catch (Throwable $e) {
-            $deployment->update([
-                'status' => DeploymentStatus::Failed,
-                'output' => $this->formatOutput($output),
-                'error' => $e->getMessage(),
-                'finished_at' => now(),
-                'duration' => now()->diffInSeconds($deployment->started_at),
-            ]);
-
-            $site->update(['status' => SiteStatus::Error]);
-
+            $this->finalizeFailedDeployment($deployment, $site, $output, $e);
+            $this->logDeployment($site, $deployment, 'error', 'Deployment başarısız: ' . $e->getMessage());
             throw $e;
         }
 
         return $deployment->fresh();
     }
 
-    protected function runDeployment(Site $site, Deployment $deployment, array &$output): void
+    protected function executeDeployment(Site $site, Deployment $deployment, array &$output): void
     {
-        $rootPath = rtrim($site->root_directory, '/') . '/' . $site->domain;
+        $rootPath = $this->getSiteRootPath($site);
 
-        // 1. Git işlemleri
+        // 1. Git operations
         if ($site->git_repository) {
+            $this->log($output, 'Updating repository...', $site, $deployment, 'info');
             $this->updateRepository($site, $deployment, $rootPath, $output);
         }
 
-        // 2. Database provision (MySQL'de oluştur)
-        $this->appendOutput($output, 'Provisioning database...');
-        $this->provisionDatabaseForDeployment($site, $output);
+        // 2. Database provision
+        $this->log($output, 'Provisioning database...', $site, $deployment, 'info');
+        $this->provisionDatabase($site, $deployment, $output);
 
-        // 3. Environment dosyası oluştur/güncelle
-        $this->appendOutput($output, 'Creating/updating .env file...');
-        $this->synchronizeEnvironmentFile($site, $rootPath, $output);
+        // 3. Environment file
+        $this->log($output, 'Syncing environment...', $site, $deployment, 'info');
+        $this->syncEnvironmentFile($site, $deployment, $rootPath, $output);
 
-        // 4. Deployment script çalıştır
+        // 4. Deployment script
         if ($site->deployment_script) {
-            $this->appendOutput($output, 'Running deployment script...');
-            $this->runDeploymentScript($site, $rootPath, $output);
+            $this->log($output, 'Running deployment script...', $site, $deployment, 'info');
+            $this->executeDeploymentScript($site, $deployment, $rootPath, $output);
         }
 
-        // 5. Cloudflare Tunnel başlat (eğer aktifse)
+        // 5. Cloudflare tunnel
         if ($site->cloudflare_tunnel_enabled && $site->cloudflare_tunnel_token) {
-            $this->appendOutput($output, 'Starting Cloudflare Tunnel...');
-            $this->startCloudfareTunnel($site, $output);
+            $this->log($output, 'Starting Cloudflare tunnel...', $site, $deployment, 'info');
+            $this->startTunnel($site, $deployment, $output);
         }
     }
 
-    protected function provisionDatabaseForDeployment(Site $site, array &$output): void
+    protected function provisionDatabase(Site $site, Deployment $deployment, array &$output): void
     {
-        // Eğer site'de zaten database bilgileri varsa, atla
-        if ($site->database_name && $site->database_user && $site->database_password) {
-            $this->appendOutput($output, '✓ Using existing database: ' . $site->database_name);
+        // Skip if credentials already exist
+        if ($this->hasDatabaseCredentials($site)) {
+            $this->log($output, "✓ Using existing database: {$site->database_name}", $site, $deployment, 'info');
             return;
         }
 
-        // Yoksa MySQL'de oluştur
         try {
-            $mySQLService = app(\App\Services\MySQLService::class);
-            $result = $mySQLService->createDatabaseForSite($site);
+            $result = $this->mySQLService->createDatabaseForSite($site);
 
-            if ($result['success']) {
-                $this->appendOutput($output, sprintf(
-                    '✓ Database created: %s (user: %s)',
-                    $result['database'],
-                    $result['user']
-                ));
-
-                // Site'yi refresh et
-                $site->refresh();
-
-                // Database tablosuna da kaydet
-                \App\Models\Database::updateOrCreate(
-                    ['name' => $result['database']],
-                    [
-                        'username' => $result['user'],
-                        'password' => $result['password'],
-                        'charset' => 'utf8mb4',
-                        'collation' => 'utf8mb4_unicode_ci',
-                        'site_id' => $site->id,
-                        'notes' => 'Deployment sırasında otomatik oluşturuldu',
-                    ]
-                );
-
-                $this->appendOutput($output, '✓ Database registered in panel');
-            } else {
-                $this->appendOutput($output, '✗ Database creation failed: ' . ($result['error'] ?? 'Unknown error'));
+            if (!$result['success']) {
+                $this->log($output, "✗ Database creation failed: {$result['error']}", $site, $deployment, 'error');
+                return;
             }
-        } catch (\Exception $e) {
-            $this->appendOutput($output, '⚠ Database provision skipped: ' . $e->getMessage());
-        }
-    }
 
-    protected function runDeploymentScript(Site $site, string $rootPath, array &$output): void
-    {
-        // Create temporary script file
-        $scriptPath = $rootPath . '/' . config('deployment.paths.script_name');
-        File::put($scriptPath, $site->deployment_script);
+            $site->refresh();
 
-        // Make script executable
-        chmod($scriptPath, config('deployment.script_permissions'));
+            $this->log($output, "✓ Database: {$result['database']} (user: {$result['user']})", $site, $deployment, 'success');
 
-        try {
-            // Run the deployment script
-            $result = Process::path($rootPath)
-                ->timeout(config('deployment.timeout'))
-                ->run('bash ' . config('deployment.paths.script_name'));
+            // Register in database panel
+            Database::updateOrCreate(
+                ['name' => $result['database']],
+                [
+                    'username' => $result['user'],
+                    'password' => $result['password'],
+                    'charset' => 'utf8mb4',
+                    'collation' => 'utf8mb4_unicode_ci',
+                    'site_id' => $site->id,
+                    'notes' => 'Auto-created during deployment',
+                ]
+            );
 
-            $this->captureProcessStreams($result, $output);
-
-            if (!$result->successful()) {
-                throw new \RuntimeException('Deployment script failed: ' . trim($result->errorOutput()));
-            }
-        } finally {
-            // Clean up script file
-            if (File::exists($scriptPath)) {
-                File::delete($scriptPath);
-            }
+            $this->log($output, '✓ Database registered', $site, $deployment, 'success');
+        } catch (Throwable $e) {
+            $this->log($output, "⚠ Database provision skipped: {$e->getMessage()}", $site, $deployment, 'warning');
+            Log::warning('Database provision failed', ['site_id' => $site->id, 'error' => $e->getMessage()]);
         }
     }
 
     protected function updateRepository(Site $site, Deployment $deployment, string $rootPath, array &$output): void
     {
-        $parentDirectory = dirname($rootPath);
+        $this->ensureDirectories($rootPath, $output, $site, $deployment);
 
-        if (!File::exists($parentDirectory)) {
-            File::makeDirectory($parentDirectory, config('deployment.directory_permissions'), true);
-            $this->appendOutput($output, "Creating parent directory: {$parentDirectory}");
-        }
+        $this->withGitEnvironment($site, function (array $env) use ($site, $deployment, $rootPath, &$output) {
+            $isFirstDeployment = !File::exists($rootPath . '/.git');
 
-        if (!File::exists($rootPath)) {
-            File::makeDirectory($rootPath, config('deployment.directory_permissions'), true);
-            $this->appendOutput($output, "Preparing site directory: {$rootPath}");
-        }
-
-        $branch = $this->resolveBranch($site);
-
-        $this->withGitEnvironment($site, function (array $environment) use ($site, $deployment, $rootPath, $branch, &$output) {
-            $gitDirectory = $rootPath . '/.git';
-
-            if (!File::exists($gitDirectory)) {
-                File::cleanDirectory($rootPath);
-                $this->appendOutput($output, 'Cloning repository...');
-
-                $this->runProcess(
-                    sprintf(
-                        'git clone -b %s %s .',
-                        escapeshellarg($branch),
-                        escapeshellarg($site->git_repository)
-                    ),
-                    $rootPath,
-                    $output,
-                    'Git clone failed',
-                    $environment
-                );
+            if ($isFirstDeployment) {
+                $this->cloneRepository($site, $deployment, $rootPath, $env, $output);
             } else {
-                $this->appendOutput($output, 'Pulling latest changes...');
-
-                $this->runProcess(
-                    sprintf('git pull origin %s', escapeshellarg($branch)),
-                    $rootPath,
-                    $output,
-                    'Git pull failed',
-                    $environment
-                );
+                $this->pullRepository($site, $deployment, $rootPath, $env, $output);
             }
 
-            $commitHashResult = $this->runProcess(
-                'git rev-parse HEAD',
-                $rootPath,
-                $output,
-                'Unable to determine commit hash',
-                $environment
-            );
-
-            $commitHash = trim($commitHashResult->output());
-
-            if ($commitHash !== '') {
-                $this->appendOutput($output, 'Checked out commit ' . substr($commitHash, 0, 7));
-            }
-
-            $commitMessage = trim(
-                $this->runProcess(
-                    'git log -1 --pretty=%B',
-                    $rootPath,
-                    $output,
-                    'Unable to read commit message',
-                    $environment
-                )->output()
-            );
-
-            $commitAuthor = trim(
-                $this->runProcess(
-                    'git log -1 --pretty=format:"%an <%ae>"',
-                    $rootPath,
-                    $output,
-                    'Unable to read commit author',
-                    $environment
-                )->output()
-            );
-
-            $deployment->update([
-                'commit_hash' => $commitHash,
-                'commit_message' => $commitMessage,
-                'commit_author' => $commitAuthor,
-            ]);
+            $this->captureCommitInfo($deployment, $site, $rootPath, $env, $output);
         });
     }
 
-    protected function synchronizeEnvironmentFile(Site $site, string $rootPath, array &$output): void
+    protected function cloneRepository(Site $site, Deployment $deployment, string $rootPath, array $env, array &$output): void
+    {
+        File::cleanDirectory($rootPath);
+        $this->log($output, 'Cloning repository...', $site, $deployment, 'info');
+
+        $this->exec(
+            sprintf('git clone -b %s %s .', escapeshellarg($this->getBranch($site)), escapeshellarg($site->git_repository)),
+            $rootPath,
+            $env,
+            $output,
+            $site,
+            $deployment
+        );
+    }
+
+    protected function pullRepository(Site $site, Deployment $deployment, string $rootPath, array $env, array &$output): void
+    {
+        $this->log($output, 'Pulling latest changes...', $site, $deployment, 'info');
+
+        $this->exec(
+            sprintf('git pull origin %s', escapeshellarg($this->getBranch($site))),
+            $rootPath,
+            $env,
+            $output,
+            $site,
+            $deployment
+        );
+    }
+
+    protected function captureCommitInfo(Deployment $deployment, Site $site, string $rootPath, array $env, array &$output): void
+    {
+        $commitHash = trim($this->exec('git rev-parse HEAD', $rootPath, $env, $output, $site, $deployment)->output());
+
+        if ($commitHash) {
+            $this->log($output, 'Commit: ' . substr($commitHash, 0, 7), $site, $deployment, 'info');
+        }
+
+        $commitMessage = trim($this->exec('git log -1 --pretty=%B', $rootPath, $env, $output, $site, $deployment)->output());
+        $commitAuthor = trim($this->exec('git log -1 --pretty=format:"%an <%ae>"', $rootPath, $env, $output, $site, $deployment)->output());
+
+        $deployment->update([
+            'commit_hash' => $commitHash,
+            'commit_message' => $commitMessage,
+            'commit_author' => $commitAuthor,
+        ]);
+    }
+
+    protected function executeDeploymentScript(Site $site, Deployment $deployment, string $rootPath, array &$output): void
+    {
+        $scriptPath = $rootPath . '/' . config('deployment.paths.script_name');
+
+        File::put($scriptPath, $site->deployment_script);
+        chmod($scriptPath, config('deployment.script_permissions'));
+
+        try {
+            $result = Process::path($rootPath)
+                ->timeout(config('deployment.timeout'))
+                ->run('bash ' . config('deployment.paths.script_name'));
+
+            $this->captureOutput($result, $output, $site, $deployment);
+
+            if (!$result->successful()) {
+                $error = 'Script failed: ' . trim($result->errorOutput());
+                $this->log($output, "✗ {$error}", $site, $deployment, 'error');
+                throw new RuntimeException($error);
+            }
+
+            $this->log($output, '✓ Deployment script completed', $site, $deployment, 'success');
+        } finally {
+            File::delete($scriptPath);
+        }
+    }
+
+    protected function syncEnvironmentFile(Site $site, Deployment $deployment, string $rootPath, array &$output): void
     {
         $this->environmentService->synchronizeEnvironmentFile(
             $site,
             $rootPath,
-            function (string $message) use (&$output): void {
-                $this->appendOutput($output, $message);
-            }
+            fn(string $msg) => $this->log($output, $msg, $site, $deployment, 'info')
         );
     }
 
-    protected function runProcess(
-        string|array $command,
-        string $workingDirectory,
-        array &$output,
-        string $failureMessage,
-        array $environment = []
-    ): ProcessResult {
-        $pendingProcess = Process::path($workingDirectory);
-
-        if (!empty($environment)) {
-            $pendingProcess = $pendingProcess->env($environment);
-        }
-
-        $result = $pendingProcess->run($command);
-
-        $this->captureProcessStreams($result, $output);
-
-        if (!$result->successful()) {
-            $error = trim($result->errorOutput());
-
-            throw new \RuntimeException(trim($failureMessage . ($error !== '' ? ': ' . $error : '')));
-        }
-
-        return $result;
-    }
-
-    protected function captureProcessStreams(ProcessResult $result, array &$output): void
+    protected function startTunnel(Site $site, Deployment $deployment, array &$output): void
     {
-        $stdOut = trim($result->output());
-        if ($stdOut !== '') {
-            $this->appendOutput($output, $stdOut);
-        }
+        $result = $this->cloudflareService->runTunnelWithToken($site);
 
-        $stdErr = trim($result->errorOutput());
-        if ($stdErr !== '') {
-            $this->appendOutput($output, $stdErr);
-        }
+        $message = $result['success']
+            ? '✓ Cloudflare tunnel started'
+            : "✗ Tunnel failed: {$result['error']}";
+
+        $level = $result['success'] ? 'success' : 'error';
+
+        $this->log($output, $message, $site, $deployment, $level);
     }
 
     protected function withGitEnvironment(Site $site, callable $callback): mixed
@@ -318,16 +238,8 @@ class DeploymentService
         $deployKeyPath = null;
 
         if ($site->git_deploy_key) {
-            $deployKeyPath = config('deployment.paths.deploy_keys') . '/deploy-key-' . $site->id . '-' . Str::random(16);
-
-            File::ensureDirectoryExists(dirname($deployKeyPath));
-            File::put($deployKeyPath, $site->git_deploy_key);
-            chmod($deployKeyPath, config('deployment.deploy_key_permissions'));
-
-            $environment['GIT_SSH_COMMAND'] = sprintf(
-                'ssh -i %s -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null',
-                escapeshellarg($deployKeyPath)
-            );
+            $deployKeyPath = $this->createDeployKey($site);
+            $environment['GIT_SSH_COMMAND'] = "ssh -i {$deployKeyPath} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null";
         }
 
         try {
@@ -339,33 +251,150 @@ class DeploymentService
         }
     }
 
+    protected function exec(string $command, string $cwd, array $env, array &$output, Site $site, Deployment $deployment): ProcessResult
+    {
+        $process = Process::path($cwd);
+
+        if (!empty($env)) {
+            $process = $process->env($env);
+        }
+
+        $result = $process->run($command);
+
+        $this->captureOutput($result, $output, $site, $deployment);
+
+        if (!$result->successful()) {
+            $error = $result->errorOutput() ?: 'Command failed';
+            $this->log($output, "✗ Command failed: {$command}", $site, $deployment, 'error', ['error' => $error]);
+            throw new RuntimeException($error);
+        }
+
+        return $result;
+    }
+
+    protected function initializeDeployment(Site $site, DeploymentTrigger $trigger, ?int $userId): Deployment
+    {
+        $site->update(['status' => SiteStatus::Deploying]);
+
+        return Deployment::create([
+            'site_id' => $site->id,
+            'user_id' => $userId,
+            'status' => DeploymentStatus::Pending,
+            'trigger' => $trigger,
+            'started_at' => now(),
+        ]);
+    }
+
+    protected function finalizeSuccessfulDeployment(Deployment $deployment, Site $site, array $output): void
+    {
+        $deployment->update([
+            'status' => DeploymentStatus::Success,
+            'output' => $this->formatOutput($output),
+            'finished_at' => now(),
+            'duration' => now()->diffInSeconds($deployment->started_at),
+        ]);
+
+        $site->update([
+            'status' => SiteStatus::Active,
+            'last_deployed_at' => now(),
+        ]);
+    }
+
+    protected function finalizeFailedDeployment(Deployment $deployment, Site $site, array $output, Throwable $e): void
+    {
+        $deployment->update([
+            'status' => DeploymentStatus::Failed,
+            'output' => $this->formatOutput($output),
+            'error' => $e->getMessage(),
+            'finished_at' => now(),
+            'duration' => now()->diffInSeconds($deployment->started_at),
+        ]);
+
+        $site->update(['status' => SiteStatus::Error]);
+    }
+
+    protected function ensureDirectories(string $rootPath, array &$output, Site $site, Deployment $deployment): void
+    {
+        $parentDirectory = dirname($rootPath);
+
+        if (!File::exists($parentDirectory)) {
+            File::makeDirectory($parentDirectory, config('deployment.directory_permissions'), true);
+            $this->log($output, "Created parent directory: {$parentDirectory}", $site, $deployment, 'info');
+        }
+
+        if (!File::exists($rootPath)) {
+            File::makeDirectory($rootPath, config('deployment.directory_permissions'), true);
+            $this->log($output, "Created site directory: {$rootPath}", $site, $deployment, 'info');
+        }
+    }
+
+    protected function createDeployKey(Site $site): string
+    {
+        $keyPath = config('deployment.paths.deploy_keys') . '/deploy-key-' . $site->id . '-' . Str::random(16);
+
+        File::ensureDirectoryExists(dirname($keyPath));
+        File::put($keyPath, $site->git_deploy_key);
+        chmod($keyPath, config('deployment.deploy_key_permissions'));
+
+        return $keyPath;
+    }
+
+    protected function captureOutput(ProcessResult $result, array &$output, Site $site, Deployment $deployment): void
+    {
+        if ($stdOut = trim($result->output())) {
+            $this->log($output, $stdOut, $site, $deployment, 'info');
+        }
+
+        if ($stdErr = trim($result->errorOutput())) {
+            $this->log($output, $stdErr, $site, $deployment, 'warning');
+        }
+    }
+
     protected function formatOutput(array $output): string
     {
-        $filtered = array_filter(array_map(fn ($line) => trim((string) $line), $output), fn ($line) => $line !== '');
-
-        return implode("\n", $filtered);
+        return implode("\n", array_filter(array_map('trim', $output)));
     }
 
-    protected function appendOutput(array &$output, string $message): void
+    protected function log(array &$output, string $message, ?Site $site = null, ?Deployment $deployment = null, string $level = 'info', ?array $context = null): void
     {
         $output[] = $message;
-    }
 
-    protected function resolveBranch(Site $site): string
-    {
-        $branch = trim((string) $site->git_branch);
-
-        return $branch !== '' ? $branch : config('deployment.git.default_branch');
-    }
-
-    protected function startCloudfareTunnel(Site $site, array &$output): void
-    {
-        $result = $this->cloudflareService->runTunnelWithToken($site);
-
-        if ($result['success']) {
-            $this->appendOutput($output, '✓ Cloudflare tunnel başlatıldı');
-        } else {
-            $this->appendOutput($output, '✗ Cloudflare tunnel başlatılamadı: ' . $result['error']);
+        if ($site) {
+            DeploymentLog::log(
+                siteId: $site->id,
+                level: $level,
+                message: $message,
+                deploymentId: $deployment?->id,
+                context: $context
+            );
         }
+    }
+
+    protected function logDeployment(Site $site, Deployment $deployment, string $level, string $message, ?array $context = null): void
+    {
+        DeploymentLog::log(
+            siteId: $site->id,
+            level: $level,
+            message: $message,
+            deploymentId: $deployment->id,
+            context: $context
+        );
+    }
+
+    protected function getSiteRootPath(Site $site): string
+    {
+        return rtrim($site->root_directory, '/') . '/' . $site->domain;
+    }
+
+    protected function getBranch(Site $site): string
+    {
+        return $site->git_branch ?: config('deployment.git.default_branch');
+    }
+
+    protected function hasDatabaseCredentials(Site $site): bool
+    {
+        return !empty($site->database_name)
+            && !empty($site->database_user)
+            && !empty($site->database_password);
     }
 }
