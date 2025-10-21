@@ -32,7 +32,7 @@ class DeploymentLogsTable
                     ->searchable()
                     ->weight('bold')
                     ->icon('heroicon-o-globe-alt')
-                    ->url(fn ($record) => $record->site ? route('filament.admin.resources.sites.edit', $record->site) : null),
+                    ->url(fn ($record) => $record->site ? \App\Filament\Resources\Sites\SiteResource::getUrl('edit', ['record' => $record->site]) : null),
 
                 TextColumn::make('deployment.id')
                     ->label('Deployment #')
