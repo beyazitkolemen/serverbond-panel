@@ -47,7 +47,28 @@ class EnvironmentService
 
     private function provisionDatabase(Site $site, ?callable $outputCallback): array
     {
-        $this->notify($outputCallback, 'Provisioning MySQL database...');
+        // Eğer site'de zaten database bilgileri varsa, direkt onları kullan (MySQL'e bağlanma)
+        if ($site->database_name && $site->database_user && $site->database_password) {
+            $this->notify($outputCallback, '✓ Using existing database credentials');
+
+            \Log::info('EnvironmentService: Using existing database credentials', [
+                'database' => $site->database_name,
+                'username' => $site->database_user,
+                'password_length' => strlen($site->database_password),
+            ]);
+
+            return [
+                'connection' => config('deployment.database.connection'),
+                'host' => config('deployment.database.host'),
+                'port' => config('deployment.database.port'),
+                'database' => $site->database_name,
+                'username' => $site->database_user,
+                'password' => $site->database_password, // Plain text
+            ];
+        }
+
+        // Yoksa MySQL'de yeni oluştur
+        $this->notify($outputCallback, 'Creating new MySQL database...');
 
         $result = $this->mySQLService->createDatabaseForSite($site);
 
@@ -61,14 +82,13 @@ class EnvironmentService
         if (($result['success'] ?? false) === true) {
             $this->notify(
                 $outputCallback,
-                sprintf('✓ Database ready: %s@%s (password: %d chars)',
+                sprintf('✓ Database created: %s@%s',
                     $result['user'],
-                    $result['database'],
-                    strlen($result['password'])
+                    $result['database']
                 )
             );
 
-            // Plain text credentials döndür (MySQL'de kullanılan)
+            // Plain text credentials döndür
             return [
                 'connection' => config('deployment.database.connection'),
                 'host' => config('deployment.database.host'),
@@ -79,10 +99,10 @@ class EnvironmentService
             ];
         }
 
-        // MySQLService başarısız oldu, hata ver
+        // MySQLService başarısız oldu
         $message = $result['error'] ?? 'MySQL veritabanı oluşturulamadı.';
 
-        $this->notify($outputCallback, '✗ Database provision failed: ' . $message);
+        $this->notify($outputCallback, '✗ Database creation failed: ' . $message);
 
         throw new RuntimeException($message);
     }
