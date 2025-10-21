@@ -39,7 +39,8 @@ class DeploymentLogsTable
                     ->sortable()
                     ->searchable()
                     ->placeholder('-')
-                    ->url(fn ($record) => $record->deployment ? route('filament.admin.resources.deployments.edit', $record->deployment) : null),
+                    ->badge()
+                    ->color('gray'),
 
                 BadgeColumn::make('level')
                     ->label('Seviye')
