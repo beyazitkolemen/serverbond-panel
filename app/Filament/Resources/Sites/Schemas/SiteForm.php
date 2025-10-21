@@ -269,7 +269,6 @@ class SiteForm
 
                                         TextInput::make('database_password')
                                             ->label('Database Şifresi')
-                                            ->revealable()
                                             ->placeholder('Otomatik oluşturulacak')
                                             ->helperText('Güvenli bir şifre otomatik oluşturulur')
                                             ->visible(fn($get) => $get('create_database') === true),
