@@ -260,38 +260,50 @@ class SitesTable
                     ->icon('heroicon-o-cog')
                     ->color('warning')
                     ->requiresConfirmation()
+                    ->modalHeading('Nginx Yapılandırılsın mı?')
+                    ->modalDescription(fn ($record) => "'{$record->domain}' için Nginx config oluşturulup aktifleştirilecek.")
                     ->action(function ($record) {
                         $nginxService = app(NginxService::class);
 
                         try {
+                            // Config oluştur
                             $config = $nginxService->generateConfig($record);
-                            if (! $nginxService->writeConfig($record, $config)) {
+
+                            // Config dosyasını yaz
+                            $writeResult = $nginxService->writeConfig($record, $config);
+                            if (!$writeResult['success']) {
                                 Notification::make()
                                     ->title('Nginx Hatası')
                                     ->danger()
-                                    ->body('Konfigürasyon dosyası yazılamadı.')
+                                    ->body($writeResult['error'] ?? 'Konfigürasyon dosyası yazılamadı.')
+                                    ->persistent()
                                     ->send();
 
                                 return;
                             }
 
-                            if (! $nginxService->enableSite($record)) {
+                            // Site'ı enable et
+                            $enableResult = $nginxService->enableSite($record);
+                            if (!$enableResult['success']) {
                                 Notification::make()
                                     ->title('Nginx Hatası')
                                     ->danger()
-                                    ->body('Site linki oluşturulamadı.')
+                                    ->body($enableResult['error'] ?? 'Site linki oluşturulamadı.')
+                                    ->persistent()
                                     ->send();
 
                                 return;
                             }
 
+                            // Config test et
                             $test = $nginxService->testConfig();
 
-                            if (! $test['success']) {
+                            if (!$test['success']) {
                                 Notification::make()
                                     ->title('Nginx Test Hatası')
                                     ->danger()
-                                    ->body($test['error'] ?: 'nginx -t başarısız oldu.')
+                                    ->body($test['error'] ?: 'nginx -t başarısız oldu. Config dosyasını kontrol edin.')
+                                    ->persistent()
                                     ->send();
 
                                 return;

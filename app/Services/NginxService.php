@@ -174,7 +174,7 @@ server {
 NGINX;
     }
 
-    public function writeConfig(Site $site, string $config): bool
+    public function writeConfig(Site $site, string $config): array
     {
         $configPath = "{$this->sitesAvailable}/{$site->domain}.conf";
 
@@ -187,36 +187,87 @@ NGINX;
             $result = Process::run(['sudo', 'mv', $tempFile, $configPath]);
 
             if (!$result->successful()) {
-                return false;
+                $error = trim($result->errorOutput());
+
+                // Sudo hatası kontrolü
+                if (str_contains($error, 'sudo') || str_contains($error, 'permission denied')) {
+                    return [
+                        'success' => false,
+                        'error' => 'Sudo yetkisi yok. Lütfen SUDO-SETUP.md dosyasını inceleyin ve sudo yetkilerini yapılandırın.',
+                    ];
+                }
+
+                return [
+                    'success' => false,
+                    'error' => $error ?: 'Config dosyası taşınamadı.',
+                ];
             }
 
             // Sudo ile izinleri ayarla
-            Process::run(['sudo', 'chmod', '644', $configPath]);
+            $chmodResult = Process::run(['sudo', 'chmod', '644', $configPath]);
 
-            return true;
+            if (!$chmodResult->successful()) {
+                return [
+                    'success' => false,
+                    'error' => 'Config dosyası izinleri ayarlanamadı.',
+                ];
+            }
+
+            return [
+                'success' => true,
+                'message' => 'Config dosyası başarıyla yazıldı.',
+            ];
         } catch (\Exception $e) {
-            return false;
+            return [
+                'success' => false,
+                'error' => $e->getMessage(),
+            ];
         }
     }
 
-    public function enableSite(Site $site): bool
+    public function enableSite(Site $site): array
     {
         $availablePath = "{$this->sitesAvailable}/{$site->domain}.conf";
         $enabledPath = "{$this->sitesEnabled}/{$site->domain}.conf";
 
         if (!File::exists($availablePath)) {
-            return false;
+            return [
+                'success' => false,
+                'error' => 'Config dosyası bulunamadı: ' . $availablePath,
+            ];
         }
 
         try {
             if (!File::exists($enabledPath)) {
                 // Sudo ile symlink oluştur
                 $result = Process::run(['sudo', 'ln', '-sf', $availablePath, $enabledPath]);
-                return $result->successful();
+
+                if (!$result->successful()) {
+                    $error = trim($result->errorOutput());
+
+                    if (str_contains($error, 'sudo') || str_contains($error, 'permission denied')) {
+                        return [
+                            'success' => false,
+                            'error' => 'Sudo yetkisi yok. Lütfen SUDO-SETUP.md dosyasını inceleyin.',
+                        ];
+                    }
+
+                    return [
+                        'success' => false,
+                        'error' => $error ?: 'Symlink oluşturulamadı.',
+                    ];
+                }
             }
-            return true;
+
+            return [
+                'success' => true,
+                'message' => 'Site başarıyla aktifleştirildi.',
+            ];
         } catch (\Exception $e) {
-            return false;
+            return [
+                'success' => false,
+                'error' => $e->getMessage(),
+            ];
         }
     }
 
