@@ -274,6 +274,7 @@ class SiteForm
                                             ->placeholder('Otomatik oluşturulacak')
                                             ->helperText('Güvenli bir şifre otomatik oluşturulur')
                                             ->visible(fn($get) => $get('create_database') === true)
+                                            ->password()
                                             ->revealable()
                                             ->copyable(),
                                     ])
@@ -293,6 +294,7 @@ class SiteForm
                                             ->label('Webhook Token')
                                             ->disabled()
                                             ->helperText('Otomatik oluşturulacak')
+                                            ->password()
                                             ->revealable()
                                             ->copyable(),
                                     ])
