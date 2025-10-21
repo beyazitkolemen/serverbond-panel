@@ -255,7 +255,7 @@ class SiteForm
                                             ->label('Database Adı')
                                             ->placeholder('Otomatik oluşturulacak')
                                             ->maxLength(64)
-                                            ->rule('nullable|regex:/^[a-zA-Z0-9_]+$/')
+                                            ->regex('/^[a-zA-Z0-9_]+$/')
                                             ->helperText('Sadece harf, rakam ve alt çizgi kullanılabilir')
                                             ->visible(fn($get) => $get('create_database') === true),
 
@@ -263,7 +263,7 @@ class SiteForm
                                             ->label('Database Kullanıcısı')
                                             ->placeholder('Otomatik oluşturulacak')
                                             ->maxLength(64)
-                                            ->rule('nullable|regex:/^[a-zA-Z0-9_]+$/')
+                                            ->regex('/^[a-zA-Z0-9_]+$/')
                                             ->helperText('Sadece harf, rakam ve alt çizgi kullanılabilir')
                                             ->visible(fn($get) => $get('create_database') === true),
 
