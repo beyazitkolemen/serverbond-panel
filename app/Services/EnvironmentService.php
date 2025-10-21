@@ -61,8 +61,8 @@ class EnvironmentService
         if (($result['success'] ?? false) === true) {
             $this->notify(
                 $outputCallback,
-                sprintf('✓ Database ready: %s@%s (password: %d chars)', 
-                    $result['user'], 
+                sprintf('✓ Database ready: %s@%s (password: %d chars)',
+                    $result['user'],
                     $result['database'],
                     strlen($result['password'])
                 )
@@ -81,7 +81,7 @@ class EnvironmentService
 
         // MySQLService başarısız oldu, hata ver
         $message = $result['error'] ?? 'MySQL veritabanı oluşturulamadı.';
-        
+
         $this->notify($outputCallback, '✗ Database provision failed: ' . $message);
 
         throw new RuntimeException($message);
@@ -161,28 +161,37 @@ class EnvironmentService
     {
         $normalizedValue = $this->normalizeEnvValue($value);
 
-        // Daha esnek pattern - boşluk, comment vb. yakalar
-        $pattern = '/^[\s]*' . preg_quote($key, '/') . '[\s]*=.*$/m';
+        // Pattern 1: Aktif key (DB_HOST=value)
+        $activePattern = '/^[\s]*' . preg_quote($key, '/') . '[\s]*=.*$/m';
 
-        // Eğer key mevcutsa değiştir
-        if (preg_match($pattern, $content) === 1) {
-            $replaced = (string) preg_replace($pattern, $key . '=' . $normalizedValue, $content);
+        // Pattern 2: Comment'li key (# DB_HOST=value)
+        $commentPattern = '/^[\s]*#[\s]*' . preg_quote($key, '/') . '[\s]*=.*$/m';
+
+        // Aktif key varsa değiştir
+        if (preg_match($activePattern, $content) === 1) {
+            $replaced = (string) preg_replace($activePattern, $key . '=' . $normalizedValue, $content);
             \Log::debug("ENV: Updated {$key}", ['value' => $normalizedValue]);
             return $replaced;
         }
 
-        // Key yoksa - DB_ ile başlayan section'ı bul ve orada ekle
+        // Comment'li key varsa, uncomment et ve değiştir
+        if (preg_match($commentPattern, $content) === 1) {
+            $replaced = (string) preg_replace($commentPattern, $key . '=' . $normalizedValue, $content);
+            \Log::debug("ENV: Uncommented and updated {$key}", ['value' => $normalizedValue]);
+            return $replaced;
+        }
+
+        // Key hiç yoksa - DB_ ile başlayan section'ı bul ve orada ekle
         if (str_starts_with($key, 'DB_')) {
-            // DB section'ını bul (son DB_ değerinden sonra)
-            $dbSectionPattern = '/(DB_[A-Z_]+\s*=.*?)(\n\s*\n)/s';
+            // DB_CONNECTION'dan sonra, ilk boş satırdan önce ekle
+            $dbSectionPattern = '/(DB_CONNECTION\s*=.*?)(\n)(?=\n|$)/s';
 
             if (preg_match($dbSectionPattern, $content)) {
-                // DB section'ı sonuna ekle
                 $replacement = "$1\n" . $key . '=' . $normalizedValue . "$2";
                 $newContent = preg_replace($dbSectionPattern, $replacement, $content, 1);
 
                 if ($newContent !== null && $newContent !== $content) {
-                    \Log::debug("ENV: Added {$key} to DB section", ['value' => $normalizedValue]);
+                    \Log::debug("ENV: Added {$key} after DB_CONNECTION");
                     return $newContent;
                 }
             }
@@ -194,7 +203,7 @@ class EnvironmentService
             $content .= PHP_EOL;
         }
 
-        \Log::debug("ENV: Added {$key} to end", ['value' => $normalizedValue]);
+        \Log::debug("ENV: Added {$key} to end");
         return $content . $key . '=' . $normalizedValue . PHP_EOL;
     }
 
