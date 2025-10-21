@@ -51,7 +51,7 @@ if [ $COMPOSER_EXIT -ne 0 ]; then
 fi
 echo "✓ Composer completed"
 
-# Database migrations 
+# Database migrations
 echo ""
 echo "🗄️ Running migrations..."
 php artisan migrate --force
