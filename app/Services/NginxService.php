@@ -179,7 +179,20 @@ NGINX;
         $configPath = "{$this->sitesAvailable}/{$site->domain}.conf";
 
         try {
-            File::put($configPath, $config);
+            // Temporary file oluştur
+            $tempFile = sys_get_temp_dir() . '/' . $site->domain . '.conf';
+            File::put($tempFile, $config);
+
+            // Sudo ile nginx dizinine taşı
+            $result = Process::run(['sudo', 'mv', $tempFile, $configPath]);
+
+            if (!$result->successful()) {
+                return false;
+            }
+
+            // Sudo ile izinleri ayarla
+            Process::run(['sudo', 'chmod', '644', $configPath]);
+
             return true;
         } catch (\Exception $e) {
             return false;
@@ -197,7 +210,9 @@ NGINX;
 
         try {
             if (!File::exists($enabledPath)) {
-                symlink($availablePath, $enabledPath);
+                // Sudo ile symlink oluştur
+                $result = Process::run(['sudo', 'ln', '-sf', $availablePath, $enabledPath]);
+                return $result->successful();
             }
             return true;
         } catch (\Exception $e) {
@@ -210,7 +225,8 @@ NGINX;
         $enabledPath = "{$this->sitesEnabled}/{$site->domain}.conf";
 
         if (File::exists($enabledPath)) {
-            return File::delete($enabledPath);
+            $result = Process::run(['sudo', 'rm', $enabledPath]);
+            return $result->successful();
         }
 
         return true;
@@ -218,22 +234,22 @@ NGINX;
 
     public function testConfig(): array
     {
-        return $this->runCommand(['nginx', '-t']);
+        return $this->runCommand(['sudo', 'nginx', '-t']);
     }
 
     public function reload(): array
     {
-        return $this->runCommand(['systemctl', 'reload', 'nginx']);
+        return $this->runCommand(['sudo', 'systemctl', 'reload', 'nginx']);
     }
 
     public function restart(): array
     {
-        return $this->runCommand(['systemctl', 'restart', 'nginx']);
+        return $this->runCommand(['sudo', 'systemctl', 'restart', 'nginx']);
     }
 
     public function getStatus(): array
     {
-        $result = Process::run(['systemctl', 'status', 'nginx']);
+        $result = Process::run(['sudo', 'systemctl', 'status', 'nginx']);
 
         return [
             'running' => $result->successful(),
