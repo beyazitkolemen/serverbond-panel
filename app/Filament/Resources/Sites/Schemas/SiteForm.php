@@ -182,8 +182,7 @@ class SiteForm
                                             ->label('Deploy Key (Opsiyonel)')
                                             ->rows(5)
                                             ->placeholder('-----BEGIN RSA PRIVATE KEY-----')
-                                            ->helperText('Private repository için SSH deploy key')
-                                            ->revealable(),
+                                            ->helperText('Private repository için SSH deploy key'),
 
                                         Toggle::make('auto_deploy')
                                             ->label('Otomatik Deploy')
@@ -316,7 +315,6 @@ class SiteForm
                                             ->rows(3)
                                             ->helperText('Token formatı: eyJhIjoiXXXXX... şeklinde olmalıdır')
                                             ->visible(fn($get) => $get('cloudflare_tunnel_enabled') === true)
-                                            ->revealable()
                                             ->columnSpanFull(),
 
                                         TextInput::make('cloudflare_tunnel_id')
