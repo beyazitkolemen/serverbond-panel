@@ -29,46 +29,71 @@ class DeploymentScriptService
     {
         return <<<'BASH'
 #!/bin/bash
-set -e
 
 echo "🚀 Laravel Deployment Started"
+echo "----------------------------------------"
 
 # Composer
 echo "📦 Installing dependencies..."
 if [ -f "composer.lock" ]; then
     echo "✓ composer.lock found, installing from lock file"
     composer install --no-dev --optimize-autoloader --no-interaction
+    COMPOSER_EXIT=$?
 else
     echo "⚠ composer.lock not found, updating dependencies"
     composer update --no-dev --optimize-autoloader --no-interaction
+    COMPOSER_EXIT=$?
 fi
 
-# Cache
-echo "🗑️ Clearing caches..."
-php artisan config:clear
-php artisan cache:clear
-php artisan route:clear
-php artisan view:clear
+if [ $COMPOSER_EXIT -ne 0 ]; then
+    echo "❌ Composer failed with exit code $COMPOSER_EXIT"
+    exit $COMPOSER_EXIT
+fi
+echo "✓ Composer completed"
 
-# Database
+# Cache temizleme (hata olsa bile devam et)
+echo ""
+echo "🗑️ Clearing caches..."
+php artisan config:clear 2>&1 || echo "⚠ Config clear skipped"
+php artisan cache:clear 2>&1 || echo "⚠ Cache clear skipped"
+php artisan route:clear 2>&1 || echo "⚠ Route clear skipped"
+php artisan view:clear 2>&1 || echo "⚠ View clear skipped"
+echo "✓ Cache clearing completed"
+
+# Database migrations (kritik)
+echo ""
 echo "🗄️ Running migrations..."
 php artisan migrate --force
+MIGRATE_EXIT=$?
+if [ $MIGRATE_EXIT -ne 0 ]; then
+    echo "❌ Migrations failed with exit code $MIGRATE_EXIT"
+    exit $MIGRATE_EXIT
+fi
+echo "✓ Migrations completed"
 
-# Optimize
+# Optimize (hata olsa bile devam et)
+echo ""
 echo "⚡ Optimizing application..."
-php artisan config:cache
-php artisan route:cache
-php artisan view:cache
+php artisan config:cache 2>&1 || echo "⚠ Config cache skipped"
+php artisan route:cache 2>&1 || echo "⚠ Route cache skipped"
+php artisan view:cache 2>&1 || echo "⚠ View cache skipped"
+echo "✓ Optimization completed"
 
-# Storage
+# Storage link (hata olsa bile devam et)
+echo ""
 echo "🔗 Linking storage..."
-php artisan storage:link || echo "⚠ Storage link already exists"
+php artisan storage:link 2>&1 || echo "⚠ Storage already linked"
 
 # Permissions
+echo ""
 echo "🔐 Setting permissions..."
-chmod -R 775 storage bootstrap/cache
+chmod -R 775 storage bootstrap/cache 2>&1 || echo "⚠ Permission setting skipped"
+echo "✓ Permissions set"
 
+echo ""
 echo "✅ Deployment completed successfully!"
+echo "----------------------------------------"
+exit 0
 BASH;
     }
 

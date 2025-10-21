@@ -189,18 +189,36 @@ class DeploymentService
         $scriptPath = $rootPath . '/' . config('deployment.paths.script_name');
 
         File::put($scriptPath, $site->deployment_script);
-        chmod($scriptPath, config('deployment.script_permissions'));
+        chmod($scriptPath, config('deployment.paths.script_permissions'));
 
         try {
             $result = Process::path($rootPath)
                 ->timeout(config('deployment.timeout'))
                 ->run('bash ' . config('deployment.paths.script_name'));
 
+            // Önce output'u yakala
             $this->captureOutput($result, $output, $site, $deployment);
 
             if (!$result->successful()) {
-                $error = 'Script failed: ' . trim($result->errorOutput());
-                $this->log($output, "✗ {$error}", $site, $deployment, 'error');
+                $exitCode = $result->exitCode();
+                $stdOut = trim($result->output());
+                $stdErr = trim($result->errorOutput());
+
+                // Son birkaç satırı al (en önemli hata genelde sonda)
+                $lastLines = array_slice(explode("\n", $stdOut ?: $stdErr), -5);
+                $errorSummary = implode("\n", $lastLines);
+
+                $error = sprintf(
+                    "Script failed (exit code: %d)\nLast output:\n%s",
+                    $exitCode,
+                    $errorSummary ?: 'No output'
+                );
+
+                $this->log($output, "✗ {$error}", $site, $deployment, 'error', [
+                    'exit_code' => $exitCode,
+                    'last_lines' => $lastLines,
+                ]);
+
                 throw new RuntimeException($error);
             }
 
