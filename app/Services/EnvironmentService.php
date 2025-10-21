@@ -29,6 +29,20 @@ class EnvironmentService
 
     private function provisionDatabase(Site $site, ?callable $outputCallback): array
     {
+        // Eğer database oluşturma kapalıysa veya bilgiler yoksa boş dön
+        if (!$site->database_name && !$site->database_user) {
+            $this->notify($outputCallback, 'Database provisioning skipped (not configured).');
+
+            return [
+                'connection' => config('deployment.database.connection'),
+                'host' => config('deployment.database.host'),
+                'port' => config('deployment.database.port'),
+                'database' => '',
+                'username' => '',
+                'password' => '',
+            ];
+        }
+
         $this->notify($outputCallback, 'Ensuring MySQL database is provisioned...');
 
         $result = $this->mySQLService->createDatabaseForSite($site);
@@ -63,13 +77,14 @@ class EnvironmentService
         if ($site->database_name && $site->database_user && $site->database_password) {
             $this->notify($outputCallback, 'Using existing database credentials stored for the site.');
 
+            // Site'den oku - database_password attribute'ü otomatik decrypt eder
             return [
                 'connection' => config('deployment.database.connection'),
                 'host' => config('deployment.database.host'),
                 'port' => config('deployment.database.port'),
                 'database' => $site->database_name,
                 'username' => $site->database_user,
-                'password' => $site->database_password,
+                'password' => $site->database_password, // Attribute sayesinde decrypt edilmiş
             ];
         }
 
@@ -110,12 +125,15 @@ class EnvironmentService
 
     private function applyDatabaseConfiguration(string $envContent, array $credentials): string
     {
-        $envContent = $this->setEnvValue($envContent, 'DB_CONNECTION', $credentials['connection']);
-        $envContent = $this->setEnvValue($envContent, 'DB_HOST', $credentials['host']);
-        $envContent = $this->setEnvValue($envContent, 'DB_PORT', $credentials['port']);
-        $envContent = $this->setEnvValue($envContent, 'DB_DATABASE', $credentials['database']);
-        $envContent = $this->setEnvValue($envContent, 'DB_USERNAME', $credentials['username']);
-        $envContent = $this->setEnvValue($envContent, 'DB_PASSWORD', $credentials['password']);
+        // Sadece database bilgileri varsa yaz
+        if (!empty($credentials['database']) && !empty($credentials['username'])) {
+            $envContent = $this->setEnvValue($envContent, 'DB_CONNECTION', $credentials['connection']);
+            $envContent = $this->setEnvValue($envContent, 'DB_HOST', $credentials['host']);
+            $envContent = $this->setEnvValue($envContent, 'DB_PORT', $credentials['port']);
+            $envContent = $this->setEnvValue($envContent, 'DB_DATABASE', $credentials['database']);
+            $envContent = $this->setEnvValue($envContent, 'DB_USERNAME', $credentials['username']);
+            $envContent = $this->setEnvValue($envContent, 'DB_PASSWORD', $credentials['password'] ?? '');
+        }
 
         return $envContent;
     }

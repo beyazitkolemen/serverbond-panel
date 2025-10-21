@@ -1,225 +1,784 @@
 # ServerBond Panel
 
-**ServerBond Agent** için geliştirilmiş, modern ve kullanıcı dostu web tabanlı sunucu yönetim paneli.
+Modern, güçlü ve kullanıcı dostu web sunucu yönetim paneli. Laravel, Filament ve modern teknolojiler ile geliştirilmiştir.
 
-## 🚀 Özellikler
+## 📋 İçindekiler
 
-### Multi-Site Yönetimi
-- ✅ **Çoklu Site Desteği**: Laravel, PHP, Static HTML, Node.js ve Python uygulamaları
-- ✅ **Otomatik Nginx Konfigürasyonu**: Her site tipi için optimize edilmiş yapılandırma
-- ✅ **Git Entegrasyonu**: Otomatik deployment ve branch yönetimi
-- ✅ **SSL/TLS Yönetimi**: Let's Encrypt ve özel sertifika desteği
+- [Özellikler](#özellikler)
+- [Teknolojiler](#teknolojiler)
+- [Kurulum](#kurulum)
+- [Kullanım](#kullanım)
+- [Mimari](#mimari)
+- [Servisler](#servisler)
+- [API](#api)
 
-### Deployment & CI/CD
-- ✅ **Tek Tıkla Deployment**: Manuel, otomatik ve webhook tetikleyicileri
-- ✅ **Deployment Geçmişi**: Tüm deployment'ların detaylı takibi
-- ✅ **Commit Bilgileri**: Her deployment için commit hash, mesaj ve yazar
-- ✅ **Gerçek Zamanlı Loglar**: Deployment sürecinin anlık takibi
+## ✨ Özellikler
 
-### Database Yönetimi
-- ✅ **Otomatik MySQL Database**: Her site için ayrı database oluşturma
-- ✅ **Kullanıcı & Yetki Yönetimi**: Güvenli database kullanıcıları
-- ✅ **Database Metrikleri**: Boyut ve kullanım istatistikleri
+### 🚀 Site Yönetimi
+- **Çoklu Site Desteği**: Laravel, PHP, Static, Node.js, Python
+- **Otomatik Deployment**: Git entegrasyonu ile otomatik dağıtım
+- **Branch Yönetimi**: GitHub, GitLab, Bitbucket desteği
+- **Custom Deployment Scripts**: Her site için özelleştirilebilir bash scriptleri
+- **Environment Yönetimi**: .env dosyalarını panel üzerinden düzenleme
 
-### Sistem Monitoring
-- ✅ **Gerçek Zamanlı Metrikler**: CPU, RAM ve Disk kullanımı
-- ✅ **Sunucu Bilgileri**: OS versiyonu, uptime, load average
-- ✅ **Site İstatistikleri**: Aktif/inaktif site sayıları
-- ✅ **Deployment Başarı Oranı**: Performans takibi
+### 🗄️ Database Yönetimi
+- **Otomatik Database Oluşturma**: Deployment sırasında otomatik MySQL database
+- **Güvenli Şifre Saklama**: Şifreler encrypt edilmiş olarak saklanır
+- **Multi-Database**: Her site için ayrı database ve kullanıcı
+- **Database Credentials**: Otomatik .env entegrasyonu
 
-### Environment Yönetimi
-- ✅ **`.env` Dosya Düzenleyici**: Her site için ayrı environment değişkenleri
-- ✅ **Güvenli Saklama**: Secret değişkenler için şifrelenmiş depolama
-- ✅ **Toplu Düzenleme**: Kolay yönetim arayüzü
+### 🔒 SSL & Güvenlik
+- **Let's Encrypt**: Otomatik SSL sertifikası
+- **Auto-Renewal**: Sertifika otomatik yenileme
+- **Webhook Security**: Güvenli deployment webhook'ları
+- **SSH Deploy Keys**: Private repository'ler için SSH key desteği
 
-## 📋 Gereksinimler
+### ☁️ Cloudflare Tunnel
+- **Zero Trust Access**: Cloudflare Tunnel entegrasyonu
+- **Otomatik Başlatma**: Deployment sonrası tunnel başlatma
+- **Systemd Entegrasyonu**: Service olarak çalışma
+- **Token Based**: Basit token ile kurulum
 
-- **Ubuntu 24.04 LTS** (ServerBond Agent ile kurulmuş)
-- **PHP 8.2+**
-- **Composer**
-- **Node.js & NPM**
-- **MySQL 8.0**
-- **Nginx**
+### ⚙️ Ayarlar Sistemi
+- **Merkezi Yönetim**: Tüm ayarlar tek yerden
+- **Gruplandırma**: Mantıksal grup desteği
+- **Şifreleme**: Hassas bilgiler için encryption
+- **Cache**: Performans için cache desteği
+- **Public/Private**: Frontend için public ayarlar
 
-## ⚡ Kurulum
+### 📊 Monitoring & Logs
+- **Deployment History**: Tüm deployment geçmişi
+- **Real-time Logs**: Canlı deployment logları
+- **Error Tracking**: Hata takibi ve raporlama
+- **Status Monitoring**: Site durumu izleme
 
-### 1. ServerBond Agent Kurulumu
+## 🛠 Teknolojiler
 
-Öncelikle sunucunuza [ServerBond Agent](https://github.com/beyazitkolemen/serverbond-agent) kurulumunu yapın:
+### Backend
+- **Framework**: Laravel 12
+- **Admin Panel**: Filament v4
+- **Database**: MySQL 8.0
+- **Cache**: Redis
+- **Queue**: Laravel Queue
 
-\`\`\`bash
-curl -fsSL https://raw.githubusercontent.com/beyazitkolemen/serverbond-agent/main/install.sh | sudo bash
-\`\`\`
+### Frontend
+- **UI Framework**: Tailwind CSS
+- **Components**: Livewire 3.5+
+- **JavaScript**: Alpine.js
+- **Icons**: Heroicons
 
-### 2. Panel Kurulumu
+### DevOps
+- **Web Server**: Nginx
+- **Process Manager**: PM2 (Node.js), Supervisor
+- **SSL**: Let's Encrypt (Certbot)
+- **Tunnel**: Cloudflare Tunnel
+- **Container**: Docker (Development)
 
-\`\`\`bash
-# Projeyi klonlayın
-git clone https://github.com/beyazitkolemen/serverbond-panel.git
+## 📦 Kurulum
+
+### Gereksinimler
+
+```bash
+- PHP 8.2+
+- MySQL 8.0+
+- Redis
+- Nginx
+- Composer
+- Node.js 18+ & NPM
+- Git
+```
+
+### 1. Repository'yi Klonlayın
+
+```bash
+git clone https://github.com/your-username/serverbond-panel.git
 cd serverbond-panel
+```
 
-# Bağımlılıkları yükleyin
+### 2. Bağımlılıkları Yükleyin
+
+```bash
+# PHP bağımlılıkları
 composer install
+
+# Frontend bağımlılıkları
 npm install
+```
 
-# Environment dosyasını oluşturun
+### 3. Environment Ayarları
+
+```bash
+# .env dosyası oluştur
 cp .env.example .env
+
+# Uygulama anahtarı oluştur
 php artisan key:generate
+```
 
-# Database oluşturun
-php artisan migrate --seed
+### 4. Database Kurulumu
 
-# Asset'leri derleyin
+```bash
+# Database oluştur
+mysql -u root -p
+CREATE DATABASE serverbond;
+
+# Migration'ları çalıştır
+php artisan migrate
+
+# Seed verilerini yükle (admin user + default settings)
+php artisan db:seed
+```
+
+### 5. Asset'leri Derle
+
+```bash
 npm run build
+```
 
-# Admin kullanıcısı oluşturun (seeder ile otomatik)
-# Email: admin@serverbond.local
-# Password: password
-\`\`\`
+### 6. Servisleri Başlat
 
-### 3. Nginx Konfigürasyonu
+```bash
+# Development
+npm run dev
 
-\`\`\`nginx
-server {
-    listen 80;
-    server_name panel.yourdomain.com;
-    root /var/www/serverbond-panel/public;
+# Production
+php artisan serve
+php artisan queue:work
+```
 
-    add_header X-Frame-Options "SAMEORIGIN";
-    add_header X-Content-Type-Options "nosniff";
+### 7. Admin Giriş
 
-    index index.php;
-
-    charset utf-8;
-
-    location / {
-        try_files $uri $uri/ /index.php?$query_string;
-    }
-
-    location = /favicon.ico { access_log off; log_not_found off; }
-    location = /robots.txt  { access_log off; log_not_found off; }
-
-    error_page 404 /index.php;
-
-    location ~ \\.php$ {
-        fastcgi_pass unix:/var/run/php/php8.4-fpm.sock;
-        fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
-        include fastcgi_params;
-    }
-
-    location ~ /\\.(?!well-known).* {
-        deny all;
-    }
-}
-\`\`\`
-
-### 4. İzinleri Ayarlayın
-
-\`\`\`bash
-sudo chown -R www-data:www-data /var/www/serverbond-panel
-sudo chmod -R 755 /var/www/serverbond-panel
-sudo chmod -R 775 /var/www/serverbond-panel/storage
-sudo chmod -R 775 /var/www/serverbond-panel/bootstrap/cache
-\`\`\`
+```
+URL: http://localhost:8000/admin
+Email: admin@serverbond.local
+Password: password
+```
 
 ## 🎯 Kullanım
 
-### İlk Giriş
+### Site Oluşturma
 
-Tarayıcınızda panel adresinize gidin ve aşağıdaki bilgilerle giriş yapın:
+1. **Admin Panel'e Giriş Yapın**
+2. **Siteler > Yeni Site**
+3. **Temel Bilgileri Doldurun**:
+   - Site Adı: "Blog Projesi"
+   - Domain: "blog.example.com"
+   - Site Tipi: Laravel
+   - PHP Versiyonu: 8.4
 
-- **Email**: `admin@serverbond.local`
-- **Şifre**: `password`
+4. **Git Ayarları**:
+   - Repository URL'ini girin
+   - Branch seçin (otomatik tespit edilir)
+   - Deploy key ekleyin (private repo için)
 
-> ⚠️ İlk girişten sonra şifrenizi mutlaka değiştirin!
+5. **Database Ayarları**:
+   - "Database Oluştur" toggle'ını aktif edin
+   - Bilgiler otomatik doldurulur
 
-### Yeni Site Ekleme
-
-1. **Sites** menüsünden **Create** butonuna tıklayın
-2. Site bilgilerini doldurun:
-   - **Name**: Site adı
-   - **Domain**: Alan adı (örn: example.com)
-   - **Type**: Site tipi (Laravel, PHP, Static, Node.js, Python)
-   - **Git Repository**: Repository URL'i
-   - **Git Branch**: Branch adı (main, master, develop vs.)
-3. **Save** butonuna tıklayın
-4. Site oluşturulduktan sonra **Deploy** butonuyla ilk deployment'ı yapın
+6. **Kaydet ve Deploy Edin**
 
 ### Deployment
 
-#### Manuel Deployment
-1. Site detay sayfasında **Deploy** butonuna tıklayın
-2. Deployment sürecini loglardan takip edin
-
 #### Otomatik Deployment
-1. Site düzenleme sayfasında **Auto Deploy** seçeneğini aktifleştirin
-2. Her git push'ta otomatik deployment yapılır
+```bash
+# Git push sonrası webhook ile otomatik
+git push origin main
+```
 
-#### Webhook Deployment
-1. Site için webhook token'ı oluşturun
-2. Git repository'nizde webhook ayarlayın
-3. Her push'ta otomatik deployment tetiklenir
+#### Manuel Deployment
+```bash
+# Panel üzerinden "Deploy" butonuna tıklayın
+```
 
-### SSL Sertifikası Ekleme
+### Environment Yönetimi
 
-1. Site detay sayfasında **SSL Certificate** sekmesine gidin
-2. **Let's Encrypt** veya **Custom Certificate** seçin
-3. Gerekli bilgileri doldurun ve kaydedin
+```bash
+# Site düzenleme > Gelişmiş > Environment (.env)
+# .env dosyasını doğrudan düzenleyin
+# Kaydet > Deploy
+```
 
-## 🛠️ Teknoloji Stack
+### Cloudflare Tunnel
 
-- **Laravel 12** - PHP Framework
-- **Filament v4** - Admin Panel
-- **Livewire 3** - Reactive Components  
-- **Alpine.js** - JavaScript Framework
-- **Tailwind CSS** - CSS Framework
-- **MySQL 8** - Database
-- **Redis** - Cache & Sessions
+1. **Cloudflare Dashboard**: Zero Trust > Tunnels
+2. **Create Tunnel**: Token'ı kopyalayın
+3. **Site Düzenle**: Gelişmiş > Cloudflare Tunnel
+4. **Token'ı Yapıştırın**: Toggle'ı aktif edin
+5. **Deploy**: Tunnel otomatik başlar
 
-## 📊 Dashboard Widgets
+## 🏗 Mimari
 
-### Server Stats Widget
-- CPU kullanımı (%)
-- RAM kullanımı (GB)
-- Disk kullanımı (GB)
-- Sistem bilgileri
+### Klasör Yapısı
 
-### Sites Stats Widget
-- Toplam site sayısı
-- Aktif/İnaktif site sayıları
-- Deployment istatistikleri
-- Başarı oranı
+```
+serverbond-panel/
+├── app/
+│   ├── Console/          # Artisan komutları
+│   ├── Enums/            # Enum sınıfları
+│   ├── Filament/         # Admin panel
+│   │   ├── Resources/    # CRUD kaynakları
+│   │   └── Widgets/      # Dashboard widget'ları
+│   ├── Http/
+│   │   └── Controllers/  # Controller'lar
+│   ├── Models/           # Eloquent modeller
+│   └── Services/         # Business logic
+├── config/               # Konfigürasyon
+├── database/
+│   ├── migrations/       # Database migration'ları
+│   └── seeders/          # Seed dosyaları
+├── resources/
+│   ├── css/              # Stil dosyaları
+│   ├── js/               # JavaScript
+│   └── views/            # Blade template'leri
+└── routes/               # Route tanımları
+```
 
-## 🔒 Güvenlik
+### Database Schema
 
-- ✅ Laravel Sanctum Authentication
-- ✅ CSRF Protection
-- ✅ XSS Protection
-- ✅ SQL Injection Protection
-- ✅ Şifrelenmiş hassas veriler (database passwords, API keys)
-- ✅ Rate Limiting
+#### sites
+```sql
+- id
+- name
+- domain
+- type (enum: laravel, php, static, nodejs, python)
+- status (enum: active, inactive, deploying, error)
+- root_directory
+- public_directory
+- git_repository
+- git_branch
+- git_deploy_key (encrypted)
+- php_version
+- database_name
+- database_user
+- database_password (encrypted)
+- ssl_enabled
+- auto_deploy
+- deploy_webhook_token (encrypted)
+- cloudflare_tunnel_token (encrypted)
+- cloudflare_tunnel_id
+- cloudflare_tunnel_enabled
+- deployment_script
+- last_deployed_at
+- notes
+- timestamps
+- soft_deletes
+```
+
+#### deployments
+```sql
+- id
+- site_id
+- user_id
+- status (enum: pending, running, success, failed)
+- trigger (enum: manual, webhook, auto)
+- commit_hash
+- commit_message
+- commit_author
+- output (text)
+- error (text)
+- started_at
+- finished_at
+- duration
+- timestamps
+```
+
+#### settings
+```sql
+- id
+- group
+- key (unique)
+- value
+- type (enum: string, integer, boolean, json, array)
+- label
+- description
+- is_public
+- is_encrypted
+- order
+- timestamps
+```
+
+## 🔧 Servisler
+
+### DeploymentService
+
+Deployment süreçlerini yöneten ana servis.
+
+#### Metotlar
+
+```php
+/**
+ * Site'yi deploy eder
+ * 
+ * @param Site $site
+ * @param DeploymentTrigger $trigger
+ * @param int|null $userId
+ * @return Deployment
+ */
+public function deploy(Site $site, DeploymentTrigger $trigger = DeploymentTrigger::Manual, ?int $userId = null): Deployment
+```
+
+**Süreç:**
+1. Deployment kaydı oluştur
+2. Site statusunu "Deploying" yap
+3. Git repository güncelle (clone/pull)
+4. .env dosyası senkronize et
+5. Deployment script çalıştır
+6. Cloudflare Tunnel başlat (aktifse)
+7. Sonucu kaydet
+
+**Örnek:**
+```php
+$deploymentService = app(DeploymentService::class);
+$deployment = $deploymentService->deploy($site, DeploymentTrigger::Manual, auth()->id());
+```
+
+#### Git İşlemleri
+
+```php
+protected function updateRepository(Site $site, Deployment $deployment, string $rootPath, array &$output): void
+```
+
+**Süreç:**
+1. Repository var mı kontrol et
+2. Yoksa clone, varsa pull
+3. Deploy key kullanımı (SSH)
+4. Commit bilgilerini kaydet
+
+#### Environment Senkronizasyonu
+
+```php
+protected function synchronizeEnvironmentFile(Site $site, string $rootPath, array &$output): void
+```
+
+**Süreç:**
+1. Database credentials al/oluştur
+2. Mevcut .env veya .env.example oku
+3. Database bilgilerini güncelle
+4. .env dosyasını yaz
+
+### MySQLService
+
+MySQL database yönetimi.
+
+#### Metotlar
+
+```php
+/**
+ * Site için database oluştur
+ * 
+ * @param Site $site
+ * @return array ['success' => bool, 'database' => string, 'user' => string, 'password' => string]
+ */
+public function createDatabaseForSite(Site $site): array
+```
+
+**Süreç:**
+1. Database adı oluştur (site bilgisinden)
+2. Random güvenli şifre oluştur
+3. Database oluştur
+4. Kullanıcı oluştur
+5. İzinleri ver
+
+**Örnek:**
+```php
+$result = $mySQLService->createDatabaseForSite($site);
+if ($result['success']) {
+    echo "Database: {$result['database']}";
+    echo "User: {$result['user']}";
+    echo "Password: {$result['password']}";
+}
+```
+
+#### Database Silme
+
+```php
+public function deleteDatabaseForSite(Site $site): array
+```
+
+### NginxService
+
+Nginx konfigürasyon yönetimi.
+
+#### Metotlar
+
+```php
+/**
+ * Site için nginx config oluştur
+ * 
+ * @param Site $site
+ * @return string
+ */
+public function generateConfig(Site $site): string
+```
+
+**Site Tipleri:**
+- **Laravel**: FastCGI-PHP, URL rewriting
+- **PHP**: Standart PHP-FPM
+- **Static**: HTML/CSS/JS, caching
+- **Node.js**: Reverse proxy (PM2)
+- **Python**: Reverse proxy (Gunicorn)
+
+**Örnek:**
+```php
+$config = $nginxService->generateConfig($site);
+$nginxService->writeConfig($site, $config);
+$nginxService->enableSite($site);
+$nginxService->reload();
+```
+
+#### Site Yönetimi
+
+```php
+public function enableSite(Site $site): bool
+public function disableSite(Site $site): bool
+public function reload(): array
+public function restart(): array
+public function getStatus(): array
+```
+
+### CloudflareService
+
+Cloudflare Tunnel yönetimi.
+
+#### Metotlar
+
+```php
+/**
+ * Token ile tunnel başlat
+ * 
+ * @param Site $site
+ * @return array ['success' => bool, 'message' => string]
+ */
+public function runTunnelWithToken(Site $site): array
+```
+
+**Süreç:**
+1. cloudflared kurulu mu kontrol et
+2. Systemd service dosyası oluştur
+3. Token ile service başlat
+4. Auto-restart ayarla
+
+**Örnek:**
+```php
+$result = $cloudflareService->runTunnelWithToken($site);
+if ($result['success']) {
+    echo "Tunnel başlatıldı!";
+}
+```
+
+#### Tunnel Yönetimi
+
+```php
+public function stopTunnel(Site $site): array
+public function getTunnelStatus(Site $site): array
+public function isInstalled(): bool
+```
+
+**Service Dosyası:**
+```ini
+[Unit]
+Description=Cloudflare Tunnel for example.com
+
+[Service]
+ExecStart=/usr/bin/cloudflared tunnel --no-autoupdate run --token {TOKEN}
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+```
+
+### SettingService
+
+Uygulama ayarları yönetimi.
+
+#### Metotlar
+
+```php
+/**
+ * Ayar değeri getir
+ * 
+ * @param string $key
+ * @param mixed $default
+ * @return mixed
+ */
+public function get(string $key, mixed $default = null): mixed
+
+/**
+ * Ayar değeri set et
+ * 
+ * @param string $key
+ * @param mixed $value
+ * @param string|null $group
+ * @param string|null $type
+ * @return Setting
+ */
+public function set(string $key, mixed $value, ?string $group = 'general', ?string $type = null): Setting
+```
+
+**Örnek:**
+```php
+// Ayar oku
+$siteName = $settingService->get('site_name', 'ServerBond');
+
+// Ayar yaz
+$settingService->set('max_deployments', 10, 'deployment', 'integer');
+
+// Grup oku
+$emailSettings = $settingService->getGroupAsArray('email');
+```
+
+#### Cache Yönetimi
+
+```php
+public function clearCache(): void
+public function refresh(): Collection
+```
+
+**Cache:**
+- 1 saat TTL
+- Otomatik invalidation (create/update/delete)
+- Laravel cache driver kullanımı
+
+### DeploymentScriptService
+
+Deployment script'leri yönetir.
+
+#### Metotlar
+
+```php
+/**
+ * Site tipi için varsayılan script
+ * 
+ * @param SiteType $type
+ * @return string
+ */
+public function getDefaultScript(SiteType $type): string
+```
+
+**Script Tipleri:**
+
+**Laravel:**
+```bash
+composer install --no-dev --optimize-autoloader
+php artisan migrate --force
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+php artisan storage:link
+chmod -R 775 storage bootstrap/cache
+```
+
+**Node.js:**
+```bash
+npm ci --production
+pm2 restart ecosystem.config.js --update-env || pm2 start ecosystem.config.js
+```
+
+**Python:**
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+python manage.py migrate --noinput
+python manage.py collectstatic --noinput
+```
+
+#### Validasyon
+
+```php
+public function validateScript(string $script): array
+```
+
+**Kontroller:**
+- Bash shebang (`#!/bin/bash`)
+- Tehlikeli komutlar (`rm -rf /`, `dd if=`)
+- Syntax kontrolü
+
+## 🔌 Helper Fonksiyonlar
+
+### Setting Helpers
+
+```php
+// Ayar oku
+setting('site_name'); // 'ServerBond'
+setting('deployment_timeout', 600);
+
+// Grup oku
+setting_group('email'); // ['smtp_host' => '...', ...]
+
+// Ayar yaz
+setting_set('site_name', 'My Panel');
+
+// Public ayarlar
+public_settings(); // Frontend için
+```
+
+## 🎨 Form Yapısı
+
+### Site Form
+
+**Tab 1: Temel Bilgiler**
+- Site Detayları (Ad, Domain, Tip, Durum)
+- Dizin Ayarları (Root, Public, PHP version)
+
+**Tab 2: Git & Deployment**
+- Git Repository (URL, Branch, Deploy Key)
+- Auto Deploy
+- Deployment Script
+
+**Tab 3: Gelişmiş**
+- Database (Toggle ile aktif/pasif)
+- SSL & Güvenlik
+- Cloudflare Tunnel
+- Environment (.env)
+- Notlar
+
+### Özellikler
+
+- **Otomatik Doldurma**: Site adından domain, database bilgileri
+- **Dinamik Görünürlük**: Site tipine göre alanlar
+- **Collapsible Sections**: Temiz arayüz
+- **Live Validation**: Anlık hata kontrolü
+- **Reactive Forms**: Değişikliklere tepki
+
+## 🚦 Deployment Akışı
+
+### 1. Hazırlık
+```
+Site Oluştur → Git Ayarları → Database Yapılandır → Kaydet
+```
+
+### 2. Deployment Başlat
+```
+Deploy Butonu → Deployment Kaydı → Status: Deploying
+```
+
+### 3. Repository İşlemleri
+```
+Check Directory → Clone/Pull → Commit Info → Branch Switch
+```
+
+### 4. Environment Hazırlık
+```
+Database Provision → .env Template → Database Config → .env Write
+```
+
+### 5. Script Çalıştırma
+```
+Script Upload → Make Executable → Execute → Capture Output
+```
+
+### 6. Cloudflare Tunnel (Opsiyonel)
+```
+Check Token → Create Service → Start Tunnel → Systemd Enable
+```
+
+### 7. Sonuç
+```
+Success/Failed → Status Update → Logs Save → Notification
+```
+
+## 📊 Config Dosyaları
+
+### deployment.php
+
+```php
+return [
+    'paths' => [
+        'deploy_keys' => storage_path('app/deploy-keys'),
+        'script_name' => 'deploy-script.sh',
+    ],
+    
+    'timeout' => env('DEPLOYMENT_TIMEOUT', 600),
+    
+    'git' => [
+        'default_branch' => env('GIT_DEFAULT_BRANCH', 'main'),
+        'api_timeout' => 3,
+        'user_agent' => 'ServerBond',
+    ],
+    
+    'nginx' => [
+        'sites_available' => '/etc/nginx/sites-available',
+        'sites_enabled' => '/etc/nginx/sites-enabled',
+        'default_php_version' => '8.4',
+    ],
+    
+    'ports' => [
+        'nodejs' => 3000,
+        'python' => 8000,
+    ],
+];
+```
+
+## 🔐 Güvenlik
+
+### Şifreleme
+- Database passwords (Laravel Encryption)
+- Git deploy keys (Laravel Encryption)
+- Webhook tokens (Laravel Encryption)
+- Cloudflare tunnel tokens (Laravel Encryption)
+
+### Validasyon
+- Domain format kontrolü
+- Repository URL validation
+- Database name regex (`[a-zA-Z0-9_]`)
+- Script güvenlik kontrolü
+
+### İzinler
+- Filament policies
+- Role-based access
+- User-site relationships
+
+## 🧪 Testing
+
+```bash
+# Unit testler
+php artisan test --filter=Unit
+
+# Feature testler
+php artisan test --filter=Feature
+
+# Specific test
+php artisan test --filter=DeploymentServiceTest
+```
+
+## 📝 Changelog
+
+### v1.0.0 (2025-10-21)
+- ✅ Site yönetimi (Multi-type support)
+- ✅ Otomatik deployment
+- ✅ Database yönetimi
+- ✅ Nginx konfigürasyon
+- ✅ SSL desteği
+- ✅ Cloudflare Tunnel
+- ✅ Settings sistemi
+- ✅ Helper fonksiyonlar
 
 ## 🤝 Katkıda Bulunma
 
-1. Fork yapın
-2. Feature branch oluşturun (`git checkout -b feature/amazing-feature`)
-3. Commit yapın (`git commit -m 'feat: Add amazing feature'`)
-4. Push yapın (`git push origin feature/amazing-feature`)
+1. Fork edin
+2. Feature branch oluşturun (`git checkout -b feature/amazing`)
+3. Commit edin (`git commit -m 'Add amazing feature'`)
+4. Push edin (`git push origin feature/amazing`)
 5. Pull Request açın
 
-## 📝 Lisans
+## 📄 Lisans
 
 MIT License - Detaylar için [LICENSE](LICENSE) dosyasına bakın.
 
-## 📧 İletişim
-
-- **GitHub**: [github.com/beyazitkolemen/serverbond-panel](https://github.com/beyazitkolemen/serverbond-panel)
-- **Issues**: [github.com/beyazitkolemen/serverbond-panel/issues](https://github.com/beyazitkolemen/serverbond-panel/issues)
-
 ## 🙏 Teşekkürler
 
-Bu proje [ServerBond Agent](https://github.com/beyazitkolemen/serverbond-agent) ile birlikte çalışacak şekilde tasarlanmıştır.
+- [Laravel](https://laravel.com)
+- [Filament](https://filamentphp.com)
+- [Livewire](https://livewire.laravel.com)
+- [Tailwind CSS](https://tailwindcss.com)
+
+## 📞 İletişim
+
+- Website: [serverbond.com](https://serverbond.com)
+- Email: info@serverbond.com
+- GitHub: [@serverbond](https://github.com/serverbond)
 
 ---
 
-**ServerBond Panel** - Professional server management made easy! 🚀
+**Made with ❤️ by ServerBond Team**

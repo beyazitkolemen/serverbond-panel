@@ -182,7 +182,8 @@ class SiteForm
                                             ->label('Deploy Key (Opsiyonel)')
                                             ->rows(5)
                                             ->placeholder('-----BEGIN RSA PRIVATE KEY-----')
-                                            ->helperText('Private repository için SSH deploy key'),
+                                            ->helperText('Private repository için SSH deploy key')
+                                            ->revealable(),
 
                                         Toggle::make('auto_deploy')
                                             ->label('Otomatik Deploy')
@@ -257,7 +258,8 @@ class SiteForm
                                             ->maxLength(64)
                                             ->regex('/^[a-zA-Z0-9_]+$/')
                                             ->helperText('Sadece harf, rakam ve alt çizgi kullanılabilir')
-                                            ->visible(fn($get) => $get('create_database') === true),
+                                            ->visible(fn($get) => $get('create_database') === true)
+                                            ->copyable(),
 
                                         TextInput::make('database_user')
                                             ->label('Database Kullanıcısı')
@@ -265,13 +267,16 @@ class SiteForm
                                             ->maxLength(64)
                                             ->regex('/^[a-zA-Z0-9_]+$/')
                                             ->helperText('Sadece harf, rakam ve alt çizgi kullanılabilir')
-                                            ->visible(fn($get) => $get('create_database') === true),
+                                            ->visible(fn($get) => $get('create_database') === true)
+                                            ->copyable(),
 
                                         TextInput::make('database_password')
                                             ->label('Database Şifresi')
                                             ->placeholder('Otomatik oluşturulacak')
                                             ->helperText('Güvenli bir şifre otomatik oluşturulur')
-                                            ->visible(fn($get) => $get('create_database') === true),
+                                            ->visible(fn($get) => $get('create_database') === true)
+                                            ->revealable()
+                                            ->copyable(),
                                     ])
                                     ->columns(3)
                                     ->collapsible()
@@ -288,7 +293,9 @@ class SiteForm
                                         TextInput::make('deploy_webhook_token')
                                             ->label('Webhook Token')
                                             ->disabled()
-                                            ->helperText('Otomatik oluşturulacak'),
+                                            ->helperText('Otomatik oluşturulacak')
+                                            ->revealable()
+                                            ->copyable(),
                                     ])
                                     ->columns(2)
                                     ->collapsible(),
@@ -309,6 +316,7 @@ class SiteForm
                                             ->rows(3)
                                             ->helperText('Token formatı: eyJhIjoiXXXXX... şeklinde olmalıdır')
                                             ->visible(fn($get) => $get('cloudflare_tunnel_enabled') === true)
+                                            ->revealable()
                                             ->columnSpanFull(),
 
                                         TextInput::make('cloudflare_tunnel_id')
