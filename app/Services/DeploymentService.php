@@ -9,6 +9,7 @@ use App\Enums\DeploymentTrigger;
 use App\Enums\SiteStatus;
 use App\Models\Deployment;
 use App\Models\Site;
+use App\Services\CloudflareService;
 use App\Services\EnvironmentService;
 use Illuminate\Process\ProcessResult;
 use Illuminate\Support\Facades\File;
@@ -20,6 +21,7 @@ class DeploymentService
 {
     public function __construct(
         private readonly EnvironmentService $environmentService,
+        private readonly CloudflareService $cloudflareService,
     ) {}
 
     public function deploy(Site $site, DeploymentTrigger $trigger = DeploymentTrigger::Manual, ?int $userId = null): Deployment
@@ -84,6 +86,12 @@ class DeploymentService
         if ($site->deployment_script) {
             $this->appendOutput($output, 'Running deployment script...');
             $this->runDeploymentScript($site, $rootPath, $output);
+        }
+
+        // Cloudflare Tunnel başlat (eğer aktifse)
+        if ($site->cloudflare_tunnel_enabled && $site->cloudflare_tunnel_token) {
+            $this->appendOutput($output, 'Starting Cloudflare Tunnel...');
+            $this->startCloudfareTunnel($site, $output);
         }
     }
 
@@ -297,5 +305,16 @@ class DeploymentService
         $branch = trim((string) $site->git_branch);
 
         return $branch !== '' ? $branch : config('deployment.git.default_branch');
+    }
+
+    protected function startCloudfareTunnel(Site $site, array &$output): void
+    {
+        $result = $this->cloudflareService->runTunnelWithToken($site);
+
+        if ($result['success']) {
+            $this->appendOutput($output, '✓ Cloudflare tunnel başlatıldı');
+        } else {
+            $this->appendOutput($output, '✗ Cloudflare tunnel başlatılamadı: ' . $result['error']);
+        }
     }
 }

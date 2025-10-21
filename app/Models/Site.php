@@ -36,6 +36,9 @@ class Site extends Model
         'ssl_enabled',
         'auto_deploy',
         'deploy_webhook_token',
+        'cloudflare_tunnel_token',
+        'cloudflare_tunnel_id',
+        'cloudflare_tunnel_enabled',
         'last_deployed_at',
         'notes',
         'deployment_script',
@@ -46,6 +49,7 @@ class Site extends Model
         'status' => SiteStatus::class,
         'ssl_enabled' => 'boolean',
         'auto_deploy' => 'boolean',
+        'cloudflare_tunnel_enabled' => 'boolean',
         'last_deployed_at' => 'datetime',
     ];
 
@@ -53,6 +57,7 @@ class Site extends Model
         'database_password',
         'git_deploy_key',
         'deploy_webhook_token',
+        'cloudflare_tunnel_token',
     ];
 
     public function deployments(): HasMany
