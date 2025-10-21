@@ -24,14 +24,15 @@ class DatabaseForm
                             ->required()
                             ->unique(ignoreRecord: true)
                             ->maxLength(64)
-                            ->rule('regex:/^[A-Za-z0-9_]+$/')
+                            ->regex('/^[A-Za-z0-9_]+$/')
                             ->helperText('Sadece harf, rakam ve alt çizgi kullanılabilir (maksimum 64 karakter)')
                             ->live(onBlur: true)
                             ->afterStateUpdated(function ($state, callable $set, callable $get) {
                                 // Username boşsa, database adından oluştur
                                 if (empty($get('username'))) {
-                                    $username = Str::limit($state, 16, '');
+                                    $username = Str::limit($state, 32, '');
                                     $set('username', $username);
+                                    $set('password', Str::random(32)); // 32 karakter
                                 }
                             }),
 
@@ -39,16 +40,17 @@ class DatabaseForm
                             ->label('Kullanıcı Adı')
                             ->required()
                             ->maxLength(32)
-                            ->rule('regex:/^[A-Za-z0-9_]+$/')
+                            ->regex('/^[A-Za-z0-9_]+$/')
                             ->helperText('Sadece harf, rakam ve alt çizgi (maksimum 32 karakter)'),
 
                         TextInput::make('password')
                             ->label('Şifre')
                             ->password()
                             ->revealable()
+                            ->copyable()
                             ->required()
-                            ->default(fn() => Str::random(16))
-                            ->helperText('Güvenli bir şifre kullanın. Otomatik oluşturuldu.'),
+                            ->default(fn() => Str::random(32))
+                            ->helperText('Güvenli 32 karakterlik şifre otomatik oluşturuldu.'),
 
                         Select::make('site_id')
                             ->label('İlişkili Site')

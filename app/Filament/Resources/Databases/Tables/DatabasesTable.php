@@ -106,19 +106,32 @@ class DatabasesTable
 
                         try {
                             // Database oluştur
-                            $mysqlService->createDatabase($record->name, $record->charset, $record->collation);
+                            $dbCreated = $mysqlService->createDatabase($record->name);
 
                             // Kullanıcı oluştur
-                            $mysqlService->createUser($record->username, $record->password);
+                            $userCreated = $mysqlService->createUser($record->username, $record->password);
 
                             // İzinleri ver
-                            $mysqlService->grantPermissions($record->name, $record->username);
+                            $privilegesGranted = $mysqlService->grantPrivileges($record->name, $record->username);
 
-                            Notification::make()
-                                ->title('MySQL Database Oluşturuldu')
-                                ->success()
-                                ->body("'{$record->name}' başarıyla MySQL'de oluşturuldu.")
-                                ->send();
+                            if ($dbCreated && $userCreated && $privilegesGranted) {
+                                Notification::make()
+                                    ->title('MySQL Database Oluşturuldu')
+                                    ->success()
+                                    ->body("'{$record->name}' başarıyla MySQL'de oluşturuldu.")
+                                    ->send();
+                            } else {
+                                Notification::make()
+                                    ->title('Kısmi Başarı')
+                                    ->warning()
+                                    ->body(sprintf(
+                                        'Database: %s, User: %s, Privileges: %s',
+                                        $dbCreated ? 'OK' : 'FAIL',
+                                        $userCreated ? 'OK' : 'FAIL',
+                                        $privilegesGranted ? 'OK' : 'FAIL'
+                                    ))
+                                    ->send();
+                            }
                         } catch (\Exception $e) {
                             Notification::make()
                                 ->title('MySQL Hatası')
@@ -133,22 +146,28 @@ class DatabasesTable
                     ->icon('heroicon-o-signal')
                     ->color('info')
                     ->action(function ($record) {
-                        $mysqlService = app(MySQLService::class);
-
                         try {
-                            $result = $mysqlService->testConnection($record->name, $record->username, $record->password);
+                            // Genel MySQL bağlantısını test et
+                            $connection = \DB::connection();
+                            $connection->select('SELECT 1');
 
-                            if ($result) {
+                            // Database'in var olup olmadığını kontrol et
+                            $dbExists = $connection->select(
+                                "SELECT SCHEMA_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = ?",
+                                [$record->name]
+                            );
+
+                            if (!empty($dbExists)) {
                                 Notification::make()
-                                    ->title('Bağlantı Başarılı')
+                                    ->title('Database Mevcut')
                                     ->success()
-                                    ->body("'{$record->name}' database'ine başarıyla bağlanıldı.")
+                                    ->body("'{$record->name}' MySQL'de mevcut.")
                                     ->send();
                             } else {
                                 Notification::make()
-                                    ->title('Bağlantı Başarısız')
-                                    ->danger()
-                                    ->body("'{$record->name}' database'ine bağlanılamadı.")
+                                    ->title('Database Bulunamadı')
+                                    ->warning()
+                                    ->body("'{$record->name}' MySQL'de bulunamadı. 'MySQL'e Oluştur' butonunu kullanın.")
                                     ->send();
                             }
                         } catch (\Exception $e) {
@@ -171,8 +190,8 @@ class DatabasesTable
                         $mysqlService = app(MySQLService::class);
 
                         try {
-                            $mysqlService->dropDatabase($record->name);
-                            $mysqlService->dropUser($record->username);
+                            $mysqlService->deleteDatabase($record->name);
+                            $mysqlService->deleteUser($record->username);
                         } catch (\Exception $e) {
                             // MySQL'de yoksa hata verme
                             \Log::warning('MySQL database/user deletion failed', [
