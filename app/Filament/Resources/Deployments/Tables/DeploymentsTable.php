@@ -34,7 +34,7 @@ class DeploymentsTable
 
                 BadgeColumn::make('status')
                     ->label('Durum')
-                    ->formatStateUsing(fn ($state) => $state->label())
+                    ->formatStateUsing(fn($state) => $state->label())
                     ->colors([
                         'gray' => DeploymentStatus::Pending,
                         'info' => DeploymentStatus::Running,
@@ -50,7 +50,7 @@ class DeploymentsTable
 
                 BadgeColumn::make('trigger')
                     ->label('Tetikleyici')
-                    ->formatStateUsing(fn ($state) => $state->label())
+                    ->formatStateUsing(fn($state) => $state->label())
                     ->colors([
                         'primary' => DeploymentTrigger::Manual,
                         'warning' => DeploymentTrigger::Auto,
@@ -69,7 +69,7 @@ class DeploymentsTable
                     ->label('Mesaj')
                     ->limit(30)
                     ->placeholder('-')
-                    ->tooltip(fn ($record) => $record->commit_message)
+                    ->tooltip(fn($record) => $record->commit_message)
                     ->toggleable(),
 
                 TextColumn::make('commit_author')
@@ -86,7 +86,7 @@ class DeploymentsTable
 
                 TextColumn::make('duration')
                     ->label('Süre')
-                    ->formatStateUsing(fn ($state) => $state ? gmdate('i:s', $state) . ' dk' : '-')
+                    ->formatStateUsing(fn($state) => $state ? gmdate('i:s', (int) $state) . ' dk' : '-')
                     ->sortable()
                     ->icon('heroicon-o-clock'),
 
@@ -126,8 +126,8 @@ class DeploymentsTable
                     ->label('Logları Görüntüle')
                     ->icon('heroicon-o-document-text')
                     ->color('info')
-                    ->modalHeading(fn ($record) => "Deployment #{$record->id} Logları")
-                    ->modalContent(fn ($record) => view('filament.deployment-logs', ['deployment' => $record]))
+                    ->modalHeading(fn($record) => "Deployment #{$record->id} Logları")
+                    ->modalContent(fn($record) => view('filament.deployment-logs', ['deployment' => $record]))
                     ->modalWidth('5xl')
                     ->slideOver(),
 
@@ -135,14 +135,14 @@ class DeploymentsTable
                     ->label('Çıktı')
                     ->icon('heroicon-o-code-bracket')
                     ->color('success')
-                    ->visible(fn ($record) => $record->output)
+                    ->visible(fn($record) => $record->output)
                     ->modalHeading('Deployment Çıktısı')
                     ->form([
                         Textarea::make('output')
                             ->label('')
                             ->rows(20)
                             ->disabled()
-                            ->default(fn ($record) => $record->output),
+                            ->default(fn($record) => $record->output),
                     ])
                     ->modalSubmitAction(false)
                     ->modalCancelActionLabel('Kapat'),
@@ -151,14 +151,14 @@ class DeploymentsTable
                     ->label('Hata')
                     ->icon('heroicon-o-exclamation-triangle')
                     ->color('danger')
-                    ->visible(fn ($record) => $record->error)
+                    ->visible(fn($record) => $record->error)
                     ->modalHeading('Deployment Hatası')
                     ->form([
                         Textarea::make('error')
                             ->label('')
                             ->rows(10)
                             ->disabled()
-                            ->default(fn ($record) => $record->error),
+                            ->default(fn($record) => $record->error),
                     ])
                     ->modalSubmitAction(false)
                     ->modalCancelActionLabel('Kapat'),
