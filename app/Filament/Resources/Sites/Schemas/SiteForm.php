@@ -294,11 +294,11 @@ class SiteForm
                                     ->collapsible(),
 
                                 Section::make('Environment (.env)')
-                                    ->description('Site\'nin .env dosyasını buradan düzenleyebilirsiniz. Deploy sonrası geçerli olur.')
+                                    ->description('Site deploy edildikten sonra .env dosyasını buradan düzenleyebilirsiniz.')
                                     ->schema([
                                         CodeEditor::make('env_content')
                                             ->label('.env Dosyası')
-                                            ->helperText('Site deploy edildikten sonra .env dosyası otomatik oluşturulur veya güncellenir.')
+                                            ->helperText('Deployment sırasında bu içerik .env dosyasına yazılacaktır.')
                                             ->dehydrateStateUsing(fn($state) => $state)
                                             ->afterStateHydrated(function ($component, $state, $record) {
                                                 if ($record && $record->exists) {
@@ -315,7 +315,8 @@ class SiteForm
                                             })
                                             ->columnSpanFull(),
                                     ])
-                                    ->collapsible(),
+                                    ->collapsible()
+                                    ->visible(fn($record) => $record !== null && $record->exists),
 
                                 Section::make('Notlar')
                                     ->schema([
