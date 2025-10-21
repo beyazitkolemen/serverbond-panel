@@ -72,8 +72,8 @@ class CloudflareService
             $serviceName = $this->getServiceName($site);
 
             // Service'i durdur ve devre dışı bırak
-            Process::run(['systemctl', 'stop', $serviceName]);
-            Process::run(['systemctl', 'disable', $serviceName]);
+            Process::run(['sudo', 'systemctl', 'stop', $serviceName]);
+            Process::run(['sudo', 'systemctl', 'disable', $serviceName]);
 
             // Config ve service dosyalarını sil
             $this->cleanupTunnelFiles($site);
@@ -96,7 +96,7 @@ class CloudflareService
     public function getTunnelStatus(Site $site): array
     {
         $serviceName = $this->getServiceName($site);
-        $result = Process::run(['systemctl', 'is-active', $serviceName]);
+        $result = Process::run(['sudo', 'systemctl', 'is-active', $serviceName]);
 
         return [
             'running' => $result->successful(),
@@ -174,11 +174,22 @@ RestartSec=5s
 WantedBy=multi-user.target
 SERVICE;
 
-        File::put($serviceFile, $serviceContent);
-        chmod($serviceFile, 0644);
+        // Temporary file oluştur
+        $tempFile = sys_get_temp_dir() . '/' . $serviceName . '.service';
+        File::put($tempFile, $serviceContent);
+
+        // Sudo ile systemd dizinine taşı
+        $result = Process::run(['sudo', 'mv', $tempFile, $serviceFile]);
+
+        if (!$result->successful()) {
+            throw new \RuntimeException('Systemd service dosyası oluşturulamadı: ' . $result->errorOutput());
+        }
+
+        // Sudo ile izinleri ayarla
+        Process::run(['sudo', 'chmod', '644', $serviceFile]);
 
         // Systemd'yi yenile
-        Process::run(['systemctl', 'daemon-reload']);
+        Process::run(['sudo', 'systemctl', 'daemon-reload']);
     }
 
     /**
@@ -188,8 +199,8 @@ SERVICE;
     {
         $serviceName = $this->getServiceName($site);
 
-        Process::run(['systemctl', 'enable', $serviceName]);
-        Process::run(['systemctl', 'start', $serviceName]);
+        Process::run(['sudo', 'systemctl', 'enable', $serviceName]);
+        Process::run(['sudo', 'systemctl', 'start', $serviceName]);
     }
 
     /**
@@ -202,11 +213,12 @@ SERVICE;
         $configFile = $this->configPath . '/sites/' . $this->getConfigFileName($site);
         $credentialsFile = $configFile . '.json';
 
-        // Dosyaları sil
+        // Sudo ile service dosyasını sil
         if (File::exists($serviceFile)) {
-            File::delete($serviceFile);
+            Process::run(['sudo', 'rm', $serviceFile]);
         }
 
+        // Config dosyalarını sil (bunlar genelde /etc/cloudflared altında)
         if (File::exists($configFile)) {
             File::delete($configFile);
         }
@@ -216,7 +228,7 @@ SERVICE;
         }
 
         // Systemd'yi yenile
-        Process::run(['systemctl', 'daemon-reload']);
+        Process::run(['sudo', 'systemctl', 'daemon-reload']);
     }
 
     /**
