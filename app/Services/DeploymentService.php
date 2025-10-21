@@ -9,8 +9,11 @@ use App\Enums\DeploymentTrigger;
 use App\Enums\SiteStatus;
 use App\Models\Deployment;
 use App\Models\Site;
+use Illuminate\Process\ProcessResult;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Str;
+use Throwable;
 
 class DeploymentService
 {
@@ -26,146 +29,57 @@ class DeploymentService
 
         $site->update(['status' => SiteStatus::Deploying]);
 
+        $output = [];
+
         try {
-            $this->runDeployment($site, $deployment);
-        } catch (\Exception $e) {
+            $deployment->update(['status' => DeploymentStatus::Running]);
+
+            $this->runDeployment($site, $deployment, $output);
+
+            $deployment->update([
+                'status' => DeploymentStatus::Success,
+                'output' => $this->formatOutput($output),
+                'finished_at' => now(),
+                'duration' => now()->diffInSeconds($deployment->started_at),
+            ]);
+
+            $site->update([
+                'status' => SiteStatus::Active,
+                'last_deployed_at' => now(),
+            ]);
+        } catch (Throwable $e) {
             $deployment->update([
                 'status' => DeploymentStatus::Failed,
+                'output' => $this->formatOutput($output),
                 'error' => $e->getMessage(),
                 'finished_at' => now(),
                 'duration' => now()->diffInSeconds($deployment->started_at),
             ]);
 
             $site->update(['status' => SiteStatus::Error]);
+
+            throw $e;
         }
 
         return $deployment->fresh();
     }
 
-    protected function runDeployment(Site $site, Deployment $deployment): void
+    protected function runDeployment(Site $site, Deployment $deployment, array &$output): void
     {
-        $deployment->update(['status' => DeploymentStatus::Running]);
-
         $rootPath = rtrim($site->root_directory, '/') . '/' . $site->domain;
-        $output = [];
 
-        // 1. Clone or pull repository
         if ($site->git_repository) {
-            // Üst dizini oluştur (eğer yoksa)
-            $parentDirectory = dirname($rootPath);
-            if (!File::exists($parentDirectory)) {
-                $output[] = "Creating parent directory: {$parentDirectory}";
-                File::makeDirectory($parentDirectory, 0755, true);
-            }
-
-            if (!File::exists($rootPath)) {
-                $output[] = "Cloning repository...";
-
-                // Önce dizini oluştur
-                File::makeDirectory($rootPath, 0755, true);
-
-                // Git clone yap
-                $result = Process::path($rootPath)
-                    ->run("git clone -b {$site->git_branch} {$site->git_repository} .");
-
-                $output[] = $result->output();
-
-                if (!$result->successful()) {
-                    // Hata varsa oluşturduğumuz dizini temizle
-                    if (File::exists($rootPath)) {
-                        File::deleteDirectory($rootPath);
-                    }
-                    throw new \Exception("Git clone failed: " . $result->errorOutput());
-                }
-            } else {
-                $output[] = "Pulling latest changes...";
-                $result = Process::path($rootPath)->run("git pull origin {$site->git_branch}");
-
-                $output[] = $result->output();
-
-                if (!$result->successful()) {
-                    throw new \Exception("Git pull failed: " . $result->errorOutput());
-                }
-            }
-
-            // Get commit info
-            $commitHash = Process::path($rootPath)->run('git rev-parse HEAD');
-            $commitMessage = Process::path($rootPath)->run('git log -1 --pretty=%B');
-            $commitAuthor = Process::path($rootPath)->run('git log -1 --pretty=format:"%an <%ae>"');
-
-            $deployment->update([
-                'commit_hash' => trim($commitHash->output()),
-                'commit_message' => trim($commitMessage->output()),
-                'commit_author' => trim($commitAuthor->output()),
-            ]);
+            $this->updateRepository($site, $deployment, $rootPath, $output);
         }
 
-        // 2. .env dosyası oluştur/güncelle
-        $output[] = "Creating/updating .env file...";
+        $this->appendOutput($output, 'Creating/updating .env file...');
 
-        // Öncelik sırası:
-        // 1. Proje içindeki .env.example
-        // 2. Panelden kaydedilmiş .env
-        // 3. Site tipine göre default template
+        $this->synchronizeEnvironmentFile($site, $rootPath, $output);
 
-        $envExamplePath = $rootPath . '/.env.example';
-        $envPath = $rootPath . '/.env';
-
-        if (File::exists($envExamplePath) && !File::exists($envPath)) {
-            // .env.example varsa ve .env yoksa, kopyala
-            File::copy($envExamplePath, $envPath);
-            $output[] = "Copied .env.example to .env";
-
-            // Panelden kaydedilmiş değerler varsa, üzerine yaz
-            $savedEnvContent = $site->getEnvFile();
-            if ($savedEnvContent) {
-                File::put($envPath, $savedEnvContent);
-                $output[] = "Updated .env with saved configuration from panel";
-            }
-        } elseif (!File::exists($envPath)) {
-            // .env yoksa ve .env.example da yoksa
-            $envContent = $site->getEnvFile();
-
-            if (!$envContent) {
-                // Panelde de yoksa default template oluştur
-                $envContent = $site->getDefaultEnvContent();
-                $output[] = "Created .env from default template";
-            } else {
-                $output[] = "Created .env from panel configuration";
-            }
-
-            if ($envContent) {
-                File::put($envPath, $envContent);
-            }
-        } else {
-            // .env zaten varsa, panelden kaydedilmiş varsa güncelle
-            $savedEnvContent = $site->getEnvFile();
-            if ($savedEnvContent) {
-                File::put($envPath, $savedEnvContent);
-                $output[] = "Updated existing .env from panel configuration";
-            } else {
-                $output[] = "Using existing .env file";
-            }
-        }
-
-        // 3. Run custom deployment script
         if ($site->deployment_script) {
-            $output[] = "Running deployment script...";
+            $this->appendOutput($output, 'Running deployment script...');
             $this->runDeploymentScript($site, $rootPath, $output);
         }
-
-        // Update deployment
-        $deployment->update([
-            'status' => DeploymentStatus::Success,
-            'output' => implode("\n", $output),
-            'finished_at' => now(),
-            'duration' => now()->diffInSeconds($deployment->started_at),
-        ]);
-
-        $site->update([
-            'status' => SiteStatus::Active,
-            'last_deployed_at' => now(),
-        ]);
     }
 
     protected function runDeploymentScript(Site $site, string $rootPath, array &$output): void
@@ -180,13 +94,13 @@ class DeploymentService
         try {
             // Run the deployment script
             $result = Process::path($rootPath)
-                ->timeout(600) // 10 dakika timeout
+                ->timeout(600)
                 ->run('bash deploy-script.sh');
 
-            $output[] = $result->output();
+            $this->captureProcessStreams($result, $output);
 
             if (!$result->successful()) {
-                throw new \Exception("Deployment script failed: " . $result->errorOutput());
+                throw new \RuntimeException('Deployment script failed: ' . trim($result->errorOutput()));
             }
         } finally {
             // Clean up script file
@@ -194,5 +108,222 @@ class DeploymentService
                 File::delete($scriptPath);
             }
         }
+    }
+
+    protected function updateRepository(Site $site, Deployment $deployment, string $rootPath, array &$output): void
+    {
+        $parentDirectory = dirname($rootPath);
+
+        if (!File::exists($parentDirectory)) {
+            File::makeDirectory($parentDirectory, 0755, true);
+            $this->appendOutput($output, "Creating parent directory: {$parentDirectory}");
+        }
+
+        if (!File::exists($rootPath)) {
+            File::makeDirectory($rootPath, 0755, true);
+            $this->appendOutput($output, "Preparing site directory: {$rootPath}");
+        }
+
+        $branch = $this->resolveBranch($site);
+
+        $this->withGitEnvironment($site, function (array $environment) use ($site, $deployment, $rootPath, $branch, &$output) {
+            $gitDirectory = $rootPath . '/.git';
+
+            if (!File::exists($gitDirectory)) {
+                File::cleanDirectory($rootPath);
+                $this->appendOutput($output, 'Cloning repository...');
+
+                $this->runProcess(
+                    sprintf(
+                        'git clone -b %s %s .',
+                        escapeshellarg($branch),
+                        escapeshellarg($site->git_repository)
+                    ),
+                    $rootPath,
+                    $output,
+                    'Git clone failed',
+                    $environment
+                );
+            } else {
+                $this->appendOutput($output, 'Pulling latest changes...');
+
+                $this->runProcess(
+                    sprintf('git pull origin %s', escapeshellarg($branch)),
+                    $rootPath,
+                    $output,
+                    'Git pull failed',
+                    $environment
+                );
+            }
+
+            $commitHashResult = $this->runProcess(
+                'git rev-parse HEAD',
+                $rootPath,
+                $output,
+                'Unable to determine commit hash',
+                $environment
+            );
+
+            $commitHash = trim($commitHashResult->output());
+
+            if ($commitHash !== '') {
+                $this->appendOutput($output, 'Checked out commit ' . substr($commitHash, 0, 7));
+            }
+
+            $commitMessage = trim(
+                $this->runProcess(
+                    'git log -1 --pretty=%B',
+                    $rootPath,
+                    $output,
+                    'Unable to read commit message',
+                    $environment
+                )->output()
+            );
+
+            $commitAuthor = trim(
+                $this->runProcess(
+                    'git log -1 --pretty=format:"%an <%ae>"',
+                    $rootPath,
+                    $output,
+                    'Unable to read commit author',
+                    $environment
+                )->output()
+            );
+
+            $deployment->update([
+                'commit_hash' => $commitHash,
+                'commit_message' => $commitMessage,
+                'commit_author' => $commitAuthor,
+            ]);
+        });
+    }
+
+    protected function synchronizeEnvironmentFile(Site $site, string $rootPath, array &$output): void
+    {
+        $envExamplePath = $rootPath . '/.env.example';
+        $envPath = $rootPath . '/.env';
+
+        if (File::exists($envExamplePath) && !File::exists($envPath)) {
+            File::copy($envExamplePath, $envPath);
+            $this->appendOutput($output, 'Copied .env.example to .env');
+
+            $savedEnvContent = $site->getEnvFile();
+            if ($savedEnvContent) {
+                File::put($envPath, $savedEnvContent);
+                $this->appendOutput($output, 'Updated .env with saved configuration from panel');
+            }
+
+            return;
+        }
+
+        if (!File::exists($envPath)) {
+            $envContent = $site->getEnvFile();
+
+            if (!$envContent) {
+                $envContent = $site->getDefaultEnvContent();
+                $this->appendOutput($output, 'Created .env from default template');
+            } else {
+                $this->appendOutput($output, 'Created .env from panel configuration');
+            }
+
+            if ($envContent) {
+                File::put($envPath, $envContent);
+            }
+
+            return;
+        }
+
+        $savedEnvContent = $site->getEnvFile();
+        if ($savedEnvContent) {
+            File::put($envPath, $savedEnvContent);
+            $this->appendOutput($output, 'Updated existing .env from panel configuration');
+        } else {
+            $this->appendOutput($output, 'Using existing .env file');
+        }
+    }
+
+    protected function runProcess(
+        string|array $command,
+        string $workingDirectory,
+        array &$output,
+        string $failureMessage,
+        array $environment = []
+    ): ProcessResult {
+        $pendingProcess = Process::path($workingDirectory);
+
+        if (!empty($environment)) {
+            $pendingProcess = $pendingProcess->env($environment);
+        }
+
+        $result = $pendingProcess->run($command);
+
+        $this->captureProcessStreams($result, $output);
+
+        if (!$result->successful()) {
+            $error = trim($result->errorOutput());
+
+            throw new \RuntimeException(trim($failureMessage . ($error !== '' ? ': ' . $error : '')));
+        }
+
+        return $result;
+    }
+
+    protected function captureProcessStreams(ProcessResult $result, array &$output): void
+    {
+        $stdOut = trim($result->output());
+        if ($stdOut !== '') {
+            $this->appendOutput($output, $stdOut);
+        }
+
+        $stdErr = trim($result->errorOutput());
+        if ($stdErr !== '') {
+            $this->appendOutput($output, $stdErr);
+        }
+    }
+
+    protected function withGitEnvironment(Site $site, callable $callback): mixed
+    {
+        $environment = [];
+        $deployKeyPath = null;
+
+        if ($site->git_deploy_key) {
+            $deployKeyPath = storage_path('app/deploy-keys/deploy-key-' . $site->id . '-' . Str::random(16));
+
+            File::ensureDirectoryExists(dirname($deployKeyPath));
+            File::put($deployKeyPath, $site->git_deploy_key);
+            chmod($deployKeyPath, 0600);
+
+            $environment['GIT_SSH_COMMAND'] = sprintf(
+                'ssh -i %s -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null',
+                escapeshellarg($deployKeyPath)
+            );
+        }
+
+        try {
+            return $callback($environment);
+        } finally {
+            if ($deployKeyPath && File::exists($deployKeyPath)) {
+                File::delete($deployKeyPath);
+            }
+        }
+    }
+
+    protected function formatOutput(array $output): string
+    {
+        $filtered = array_filter(array_map(fn ($line) => trim((string) $line), $output), fn ($line) => $line !== '');
+
+        return implode("\n", $filtered);
+    }
+
+    protected function appendOutput(array &$output, string $message): void
+    {
+        $output[] = $message;
+    }
+
+    protected function resolveBranch(Site $site): string
+    {
+        $branch = trim((string) $site->git_branch);
+
+        return $branch !== '' ? $branch : 'main';
     }
 }
