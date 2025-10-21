@@ -62,6 +62,11 @@ class Site extends Model
         return $this->hasOne(Deployment::class)->latestOfMany();
     }
 
+    public function deploymentLogs(): HasMany
+    {
+        return $this->hasMany(DeploymentLog::class)->latest();
+    }
+
     public function sslCertificate(): HasOne
     {
         return $this->hasOne(SslCertificate::class);

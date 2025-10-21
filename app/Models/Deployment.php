@@ -8,6 +8,7 @@ use App\Enums\DeploymentStatus;
 use App\Enums\DeploymentTrigger;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Deployment extends Model
 {
@@ -41,6 +42,11 @@ class Deployment extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function deploymentLogs(): HasMany
+    {
+        return $this->hasMany(DeploymentLog::class)->latest();
     }
 
     public function isRunning(): bool
