@@ -49,7 +49,7 @@ class SiteForm
 
                                                     $set('database_name', $dbPrefix . '_db');
                                                     $set('database_user', $dbPrefix . '_user');
-                                                    $set('database_password', Str::random(16));
+                                                    $set('database_password', Str::random(32)); // 32 karakter (MySQL ile aynı)
                                                 }
                                             }),
 
@@ -239,7 +239,7 @@ class SiteForm
 
                                                         $set('database_name', $dbPrefix . '_db');
                                                         $set('database_user', $dbPrefix . '_user');
-                                                        $set('database_password', Str::random(16));
+                                                        $set('database_password', Str::random(32)); // 32 karakter (MySQL ile aynı)
                                                     }
                                                 } elseif (!$state) {
                                                     // Toggle kapatıldığında database bilgilerini temizle

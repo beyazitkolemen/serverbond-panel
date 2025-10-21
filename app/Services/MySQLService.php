@@ -67,41 +67,51 @@ class MySQLService
     public function createDatabaseForSite(Site $site): array
     {
         try {
+            // Database bilgilerini al veya oluştur
+            $needsNewDatabase = empty($site->database_name);
+            $needsNewUser = empty($site->database_user);
+            $needsNewPassword = empty($site->database_password);
+
             $dbName = $site->database_name ?: 'db_' . Str::slug($site->domain, '_');
             $dbUser = $site->database_user ?: 'user_' . Str::slug($site->domain, '_');
-            $dbPassword = $site->database_password
-                ? $site->database_password
-                : Str::random(32);
+
+            // Şifre - site'de varsa onu kullan, yoksa yeni oluştur
+            $dbPassword = $needsNewPassword
+                ? Str::random(32)
+                : $site->database_password; // Plain text
 
             $dbName = $this->normalizeIdentifier($dbName);
             $dbUser = $this->normalizeIdentifier($dbUser);
 
+            // Database ve user oluştur (IF NOT EXISTS kullanıldığı için güvenli)
             $databaseCreated = $this->createDatabase($dbName);
             $userCreated = $this->createUser($dbUser, $dbPassword);
             $privilegesGranted = $this->grantPrivileges($dbName, $dbUser);
 
             if ($databaseCreated && $userCreated && $privilegesGranted) {
-                // Site'ye kaydetme - sadece boş olan alanları güncelle
+                // Sadece eksik olan bilgileri kaydet
                 $updates = [];
-                if (!$site->database_name) {
+
+                if ($needsNewDatabase) {
                     $updates['database_name'] = $dbName;
                 }
-                if (!$site->database_user) {
+                if ($needsNewUser) {
                     $updates['database_user'] = $dbUser;
                 }
-                if (!$site->database_password) {
-                    $updates['database_password'] = $dbPassword;
+                if ($needsNewPassword) {
+                    $updates['database_password'] = $dbPassword; // Plain text olarak kaydet
                 }
 
                 if (!empty($updates)) {
                     $site->update($updates);
                 }
 
+                // Kullanılan şifreyi döndür (plain text - .env için)
                 return [
                     'success' => true,
                     'database' => $dbName,
                     'user' => $dbUser,
-                    'password' => $dbPassword, // Plain text password döndür
+                    'password' => $dbPassword, // MySQL'de kullanılan plain text şifre
                 ];
             }
 

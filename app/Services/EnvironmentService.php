@@ -67,8 +67,8 @@ class EnvironmentService
         if ($site->database_name && $site->database_user && $site->database_password) {
             $this->notify($outputCallback, 'Using existing database credentials stored for the site.');
 
-            // Site'den oku - database_password attribute'ü otomatik decrypt eder
-            $password = $site->database_password; // Decrypt edilmiş
+            // Site'den oku - plain text şifre
+            $password = $site->database_password;
 
             $this->notify($outputCallback, sprintf('Retrieved password length: %d', strlen($password)));
 
@@ -78,7 +78,7 @@ class EnvironmentService
                 'port' => config('deployment.database.port'),
                 'database' => $site->database_name,
                 'username' => $site->database_user,
-                'password' => $password, // Decrypt edilmiş password
+                'password' => $password, // Plain text password
             ];
         }
 
