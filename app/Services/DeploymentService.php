@@ -189,7 +189,7 @@ class DeploymentService
         $scriptPath = $rootPath . '/' . config('deployment.paths.script_name');
 
         File::put($scriptPath, $site->deployment_script);
-        chmod($scriptPath, config('deployment.paths.script_permissions'));
+        chmod($scriptPath, config('deployment.script_permissions'));
 
         try {
             $result = Process::path($rootPath)
