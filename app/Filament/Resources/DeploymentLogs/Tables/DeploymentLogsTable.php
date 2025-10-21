@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\DeploymentLogs\Tables;
 
+use Filament\Actions\Action;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
 use Filament\Forms\Components\DatePicker;
-use Filament\Tables\Actions\BulkActionGroup;
-use Filament\Tables\Actions\DeleteAction;
-use Filament\Tables\Actions\DeleteBulkAction;
-use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\BadgeColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
@@ -108,14 +107,18 @@ class DeploymentLogsTable
                             );
                     }),
             ])
-            ->actions([
-                ViewAction::make()
+            ->recordActions([
+                Action::make('viewDetails')
+                    ->label('Detay')
+                    ->icon('heroicon-o-eye')
+                    ->color('info')
                     ->modalHeading(fn ($record) => 'Log Detayı #' . $record->id)
-                    ->modalContent(fn ($record) => view('filament.resources.deployment-logs.view-log', [
+                    ->modalContent(fn ($record) => view('filament.deployment-log-details', [
                         'record' => $record,
-                    ])),
-
-                DeleteAction::make(),
+                    ]))
+                    ->modalWidth('3xl')
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('Kapat'),
             ])
             ->bulkActions([
                 BulkActionGroup::make([
