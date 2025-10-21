@@ -6,37 +6,33 @@ namespace App\Services;
 
 use App\Models\Site;
 use Illuminate\Support\Facades\File;
-use RuntimeException;
 
 class EnvironmentService
 {
-    public function __construct(
-        private readonly MySQLService $mySQLService,
-    ) {}
 
     public function synchronizeEnvironmentFile(Site $site, string $rootPath, ?callable $outputCallback = null): void
     {
         File::ensureDirectoryExists($rootPath);
 
-        // Base content'i önce al (template bilgileri ile)
+        // Base content al (template bilgileri ile)
         $envContent = $this->resolveBaseEnvironmentContent($site, $rootPath, $outputCallback);
 
-        // Database provision et (başarısız olsa da devam eder)
-        try {
-            $credentials = $this->provisionDatabase($site, $outputCallback);
+        // Database bilgileri site'de varsa uygula
+        if ($site->database_name && $site->database_user && $site->database_password) {
+            $this->notify($outputCallback, 'Applying database configuration...');
 
-            // Site'yi refresh et (database bilgileri güncellenmiş olabilir)
-            $site->refresh();
+            $credentials = [
+                'connection' => config('deployment.database.connection'),
+                'host' => config('deployment.database.host'),
+                'port' => config('deployment.database.port'),
+                'database' => $site->database_name,
+                'username' => $site->database_user,
+                'password' => $site->database_password,
+            ];
 
-            // Database config uygula
             $envContent = $this->applyDatabaseConfiguration($envContent, $credentials);
-        } catch (\Exception $e) {
-            $this->notify($outputCallback, '⚠ Database provision warning: ' . $e->getMessage());
-            $this->notify($outputCallback, 'Continuing with existing .env values...');
-
-            \Log::warning('EnvironmentService: Database provision failed, using template', [
-                'error' => $e->getMessage(),
-            ]);
+        } else {
+            $this->notify($outputCallback, 'No database credentials found, using template defaults...');
         }
 
         // .env dosyasına yaz
@@ -45,67 +41,6 @@ class EnvironmentService
         $this->notify($outputCallback, '.env file synchronized successfully.');
     }
 
-    private function provisionDatabase(Site $site, ?callable $outputCallback): array
-    {
-        // Eğer site'de zaten database bilgileri varsa, direkt onları kullan (MySQL'e bağlanma)
-        if ($site->database_name && $site->database_user && $site->database_password) {
-            $this->notify($outputCallback, '✓ Using existing database credentials');
-
-            \Log::info('EnvironmentService: Using existing database credentials', [
-                'database' => $site->database_name,
-                'username' => $site->database_user,
-                'password_length' => strlen($site->database_password),
-            ]);
-
-            return [
-                'connection' => config('deployment.database.connection'),
-                'host' => config('deployment.database.host'),
-                'port' => config('deployment.database.port'),
-                'database' => $site->database_name,
-                'username' => $site->database_user,
-                'password' => $site->database_password, // Plain text
-            ];
-        }
-
-        // Yoksa MySQL'de yeni oluştur
-        $this->notify($outputCallback, 'Creating new MySQL database...');
-
-        $result = $this->mySQLService->createDatabaseForSite($site);
-
-        \Log::info('EnvironmentService: MySQL provision result', [
-            'success' => $result['success'] ?? false,
-            'has_database' => isset($result['database']),
-            'has_user' => isset($result['user']),
-            'has_password' => isset($result['password']),
-        ]);
-
-        if (($result['success'] ?? false) === true) {
-            $this->notify(
-                $outputCallback,
-                sprintf('✓ Database created: %s@%s',
-                    $result['user'],
-                    $result['database']
-                )
-            );
-
-            // Plain text credentials döndür
-            return [
-                'connection' => config('deployment.database.connection'),
-                'host' => config('deployment.database.host'),
-                'port' => config('deployment.database.port'),
-                'database' => $result['database'],
-                'username' => $result['user'],
-                'password' => $result['password'], // Plain text
-            ];
-        }
-
-        // MySQLService başarısız oldu
-        $message = $result['error'] ?? 'MySQL veritabanı oluşturulamadı.';
-
-        $this->notify($outputCallback, '✗ Database creation failed: ' . $message);
-
-        throw new RuntimeException($message);
-    }
 
     private function resolveBaseEnvironmentContent(Site $site, string $rootPath, ?callable $outputCallback): string
     {
@@ -156,31 +91,115 @@ class EnvironmentService
             return $envContent;
         }
 
-        // Database config replacements
-        $replacements = [
-            '/^DB_CONNECTION=.*$/m'     => 'DB_CONNECTION=' . $credentials['connection'],
-            '/^#\s*DB_HOST=.*$/m'       => 'DB_HOST=' . $credentials['host'],
-            '/^DB_HOST=.*$/m'           => 'DB_HOST=' . $credentials['host'],
-            '/^#\s*DB_PORT=.*$/m'       => 'DB_PORT=' . $credentials['port'],
-            '/^DB_PORT=.*$/m'           => 'DB_PORT=' . $credentials['port'],
-            '/^#\s*DB_DATABASE=.*$/m'   => 'DB_DATABASE=' . $credentials['database'],
-            '/^DB_DATABASE=.*$/m'       => 'DB_DATABASE=' . $credentials['database'],
-            '/^#\s*DB_USERNAME=.*$/m'   => 'DB_USERNAME=' . $credentials['username'],
-            '/^DB_USERNAME=.*$/m'       => 'DB_USERNAME=' . $credentials['username'],
-            '/^#\s*DB_PASSWORD=.*$/m'   => 'DB_PASSWORD=' . ($credentials['password'] ?? ''),
-            '/^DB_PASSWORD=.*$/m'       => 'DB_PASSWORD=' . ($credentials['password'] ?? ''),
+        // Satır satır işle - daha garantili
+        $lines = explode("\n", $envContent);
+        $processed = [];
+        $dbKeysFound = [
+            'DB_CONNECTION' => false,
+            'DB_HOST' => false,
+            'DB_PORT' => false,
+            'DB_DATABASE' => false,
+            'DB_USERNAME' => false,
+            'DB_PASSWORD' => false,
         ];
 
-        foreach ($replacements as $pattern => $replacement) {
-            if (preg_match($pattern, $envContent)) {
-                $envContent = (string) preg_replace($pattern, $replacement, $envContent);
-                \Log::debug("ENV: Applied replacement", ['pattern' => $pattern, 'replacement' => $replacement]);
+        foreach ($lines as $line) {
+            $originalLine = $line;
+            $matched = false;
+
+            // DB_CONNECTION
+            if (preg_match('/^DB_CONNECTION=/i', $line)) {
+                $line = 'DB_CONNECTION=' . $credentials['connection'];
+                $dbKeysFound['DB_CONNECTION'] = true;
+                $matched = true;
+            }
+            // # DB_HOST (comment'li)
+            elseif (preg_match('/^#\s*DB_HOST=/i', $line)) {
+                $line = 'DB_HOST=' . $credentials['host'];
+                $dbKeysFound['DB_HOST'] = true;
+                $matched = true;
+            }
+            // DB_HOST (aktif)
+            elseif (preg_match('/^DB_HOST=/i', $line)) {
+                $line = 'DB_HOST=' . $credentials['host'];
+                $dbKeysFound['DB_HOST'] = true;
+                $matched = true;
+            }
+            // # DB_PORT (comment'li)
+            elseif (preg_match('/^#\s*DB_PORT=/i', $line)) {
+                $line = 'DB_PORT=' . $credentials['port'];
+                $dbKeysFound['DB_PORT'] = true;
+                $matched = true;
+            }
+            // DB_PORT (aktif)
+            elseif (preg_match('/^DB_PORT=/i', $line)) {
+                $line = 'DB_PORT=' . $credentials['port'];
+                $dbKeysFound['DB_PORT'] = true;
+                $matched = true;
+            }
+            // # DB_DATABASE (comment'li)
+            elseif (preg_match('/^#\s*DB_DATABASE=/i', $line)) {
+                $line = 'DB_DATABASE=' . $credentials['database'];
+                $dbKeysFound['DB_DATABASE'] = true;
+                $matched = true;
+            }
+            // DB_DATABASE (aktif)
+            elseif (preg_match('/^DB_DATABASE=/i', $line)) {
+                $line = 'DB_DATABASE=' . $credentials['database'];
+                $dbKeysFound['DB_DATABASE'] = true;
+                $matched = true;
+            }
+            // # DB_USERNAME (comment'li)
+            elseif (preg_match('/^#\s*DB_USERNAME=/i', $line)) {
+                $line = 'DB_USERNAME=' . $credentials['username'];
+                $dbKeysFound['DB_USERNAME'] = true;
+                $matched = true;
+            }
+            // DB_USERNAME (aktif)
+            elseif (preg_match('/^DB_USERNAME=/i', $line)) {
+                $line = 'DB_USERNAME=' . $credentials['username'];
+                $dbKeysFound['DB_USERNAME'] = true;
+                $matched = true;
+            }
+            // # DB_PASSWORD (comment'li)
+            elseif (preg_match('/^#\s*DB_PASSWORD=/i', $line)) {
+                $line = 'DB_PASSWORD=' . ($credentials['password'] ?? '');
+                $dbKeysFound['DB_PASSWORD'] = true;
+                $matched = true;
+            }
+            // DB_PASSWORD (aktif)
+            elseif (preg_match('/^DB_PASSWORD=/i', $line)) {
+                $line = 'DB_PASSWORD=' . ($credentials['password'] ?? '');
+                $dbKeysFound['DB_PASSWORD'] = true;
+                $matched = true;
+            }
+
+            if ($matched) {
+                \Log::debug("ENV: Replaced line", ['from' => $originalLine, 'to' => $line]);
+            }
+
+            $processed[] = $line;
+        }
+
+        // Eksik kalan key'leri sona ekle
+        foreach ($dbKeysFound as $key => $found) {
+            if (!$found) {
+                $value = match($key) {
+                    'DB_CONNECTION' => $credentials['connection'],
+                    'DB_HOST' => $credentials['host'],
+                    'DB_PORT' => $credentials['port'],
+                    'DB_DATABASE' => $credentials['database'],
+                    'DB_USERNAME' => $credentials['username'],
+                    'DB_PASSWORD' => $credentials['password'] ?? '',
+                };
+                $processed[] = "{$key}={$value}";
+                \Log::debug("ENV: Added missing key", ['key' => $key, 'value' => $value]);
             }
         }
 
         \Log::info('EnvironmentService: Database config applied successfully');
 
-        return $envContent;
+        return implode("\n", $processed);
     }
 
     private function setEnvValue(string $content, string $key, string $value): string

@@ -75,23 +75,59 @@ class DeploymentService
     {
         $rootPath = rtrim($site->root_directory, '/') . '/' . $site->domain;
 
+        // 1. Git işlemleri
         if ($site->git_repository) {
             $this->updateRepository($site, $deployment, $rootPath, $output);
         }
 
-        $this->appendOutput($output, 'Creating/updating .env file...');
+        // 2. Database provision (MySQL'de oluştur)
+        $this->appendOutput($output, 'Provisioning database...');
+        $this->provisionDatabaseForDeployment($site, $output);
 
+        // 3. Environment dosyası oluştur/güncelle
+        $this->appendOutput($output, 'Creating/updating .env file...');
         $this->synchronizeEnvironmentFile($site, $rootPath, $output);
 
+        // 4. Deployment script çalıştır
         if ($site->deployment_script) {
             $this->appendOutput($output, 'Running deployment script...');
             $this->runDeploymentScript($site, $rootPath, $output);
         }
 
-        // Cloudflare Tunnel başlat (eğer aktifse)
+        // 5. Cloudflare Tunnel başlat (eğer aktifse)
         if ($site->cloudflare_tunnel_enabled && $site->cloudflare_tunnel_token) {
             $this->appendOutput($output, 'Starting Cloudflare Tunnel...');
             $this->startCloudfareTunnel($site, $output);
+        }
+    }
+
+    protected function provisionDatabaseForDeployment(Site $site, array &$output): void
+    {
+        // Eğer site'de zaten database bilgileri varsa, atla
+        if ($site->database_name && $site->database_user && $site->database_password) {
+            $this->appendOutput($output, '✓ Using existing database: ' . $site->database_name);
+            return;
+        }
+
+        // Yoksa MySQL'de oluştur
+        try {
+            $mySQLService = app(\App\Services\MySQLService::class);
+            $result = $mySQLService->createDatabaseForSite($site);
+
+            if ($result['success']) {
+                $this->appendOutput($output, sprintf(
+                    '✓ Database created: %s (user: %s)',
+                    $result['database'],
+                    $result['user']
+                ));
+
+                // Site'yi refresh et
+                $site->refresh();
+            } else {
+                $this->appendOutput($output, '✗ Database creation failed: ' . ($result['error'] ?? 'Unknown error'));
+            }
+        } catch (\Exception $e) {
+            $this->appendOutput($output, '⚠ Database provision skipped: ' . $e->getMessage());
         }
     }
 

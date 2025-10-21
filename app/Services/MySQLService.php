@@ -45,71 +45,82 @@ class MySQLService
     public function createUser(string $username, string $password): bool
     {
         try {
-            // % wildcard kullan - tüm host'lardan erişim için
-            $identifier = $this->formatUserIdentifier($username, '%');
+            $normalizedUser = $this->normalizeIdentifier($username);
 
-            \Log::info('MySQLService: Attempting to create user', [
-                'username' => $username,
-                'identifier' => $identifier,
+            \Log::info('MySQLService: Creating/updating MySQL user', [
+                'username' => $normalizedUser,
+                'host' => '%',
                 'password_length' => strlen($password),
             ]);
 
+            // MySQL 8: CREATE USER IF NOT EXISTS
             $result = $this->connection()->statement(
-                "CREATE USER IF NOT EXISTS {$identifier} IDENTIFIED BY ?",
+                "CREATE USER IF NOT EXISTS '{$normalizedUser}'@'%' IDENTIFIED BY ?",
                 [$password]
             );
 
-            \Log::info('MySQLService: createUser result', [
-                'user' => $username,
-                'identifier' => $identifier,
+            \Log::info('MySQLService: User created/verified', [
+                'user' => $normalizedUser,
                 'success' => $result,
             ]);
 
             return $result;
         } catch (Throwable $e) {
-            \Log::error('MySQLService: createUser EXCEPTION', [
+            \Log::error('MySQLService: User creation failed', [
                 'user' => $username,
-                'identifier' => $identifier ?? 'N/A',
                 'error' => $e->getMessage(),
                 'code' => $e->getCode(),
-                'trace' => $e->getTraceAsString(),
             ]);
-            return false;
+
+            // Fallback: Try with different syntax
+            try {
+                $this->connection()->statement(
+                    "CREATE USER '{$normalizedUser}'@'%' IDENTIFIED BY '{$password}'"
+                );
+                \Log::info('MySQLService: User created with fallback method');
+                return true;
+            } catch (Throwable $e2) {
+                \Log::error('MySQLService: Fallback also failed', [
+                    'error' => $e2->getMessage(),
+                ]);
+                return false;
+            }
         }
     }
 
     public function grantPrivileges(string $databaseName, string $username): bool
     {
         try {
-            $database = $this->quoteIdentifier($this->normalizeIdentifier($databaseName));
-            // % wildcard kullan - tüm host'lardan erişim için
-            $user = $this->formatUserIdentifier($username, '%');
+            $normalizedDb = $this->normalizeIdentifier($databaseName);
+            $normalizedUser = $this->normalizeIdentifier($username);
 
+            \Log::info('MySQLService: Granting privileges', [
+                'database' => $normalizedDb,
+                'user' => $normalizedUser,
+                'host' => '%',
+            ]);
+
+            // MySQL 8: Direkt GRANT (user zaten oluşturuldu)
             $granted = $this->connection()->statement(
-                "GRANT ALL PRIVILEGES ON {$database}.* TO {$user}"
+                "GRANT ALL PRIVILEGES ON `{$normalizedDb}`.* TO '{$normalizedUser}'@'%'"
             );
 
             if (!$granted) {
-                \Log::error('MySQLService: GRANT statement failed', [
-                    'database' => $databaseName,
-                    'user' => $username,
-                    'user_identifier' => $user,
-                ]);
+                \Log::error('MySQLService: GRANT failed');
                 return false;
             }
 
-            $flushed = $this->connection()->statement('FLUSH PRIVILEGES');
+            // MySQL 8: FLUSH PRIVILEGES (genelde otomatik ama yine de çalıştır)
+            $this->connection()->statement('FLUSH PRIVILEGES');
 
-            \Log::debug('MySQLService: grantPrivileges executed', [
-                'database' => $databaseName,
-                'user' => $username,
-                'granted' => $granted,
-                'flushed' => $flushed,
+            \Log::info('MySQLService: Privileges granted successfully', [
+                'database' => $normalizedDb,
+                'user' => $normalizedUser,
             ]);
 
-            return $flushed;
+            return true;
         } catch (Throwable $e) {
-            \Log::error('MySQLService: grantPrivileges failed', [
+            \Log::error('MySQLService: grantPrivileges EXCEPTION', [
                 'database' => $databaseName,
                 'user' => $username,
                 'error' => $e->getMessage(),
