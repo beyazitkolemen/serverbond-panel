@@ -18,17 +18,26 @@ class EnvironmentService
     {
         File::ensureDirectoryExists($rootPath);
 
-        // Önce database provision et
-        $credentials = $this->provisionDatabase($site, $outputCallback);
-
-        // Site'yi refresh et (database bilgileri güncellenmiş olabilir)
-        $site->refresh();
-
-        // Base content al
+        // Base content'i önce al (template bilgileri ile)
         $envContent = $this->resolveBaseEnvironmentContent($site, $rootPath, $outputCallback);
 
-        // Database config uygula
-        $envContent = $this->applyDatabaseConfiguration($envContent, $credentials);
+        // Database provision et (başarısız olsa da devam eder)
+        try {
+            $credentials = $this->provisionDatabase($site, $outputCallback);
+
+            // Site'yi refresh et (database bilgileri güncellenmiş olabilir)
+            $site->refresh();
+
+            // Database config uygula
+            $envContent = $this->applyDatabaseConfiguration($envContent, $credentials);
+        } catch (\Exception $e) {
+            $this->notify($outputCallback, '⚠ Database provision warning: ' . $e->getMessage());
+            $this->notify($outputCallback, 'Continuing with existing .env values...');
+
+            \Log::warning('EnvironmentService: Database provision failed, using template', [
+                'error' => $e->getMessage(),
+            ]);
+        }
 
         // .env dosyasına yaz
         File::put($rootPath . '/.env', $envContent);
@@ -42,11 +51,18 @@ class EnvironmentService
 
         $result = $this->mySQLService->createDatabaseForSite($site);
 
+        \Log::info('EnvironmentService: MySQL provision result', [
+            'success' => $result['success'] ?? false,
+            'has_database' => isset($result['database']),
+            'has_user' => isset($result['user']),
+            'has_password' => isset($result['password']),
+        ]);
+
         if (($result['success'] ?? false) === true) {
             $this->notify(
                 $outputCallback,
-                sprintf('✓ Database ready: %s@%s (password: %d chars)',
-                    $result['user'],
+                sprintf('✓ Database ready: %s@%s (password: %d chars)', 
+                    $result['user'], 
                     $result['database'],
                     strlen($result['password'])
                 )
@@ -65,7 +81,7 @@ class EnvironmentService
 
         // MySQLService başarısız oldu, hata ver
         $message = $result['error'] ?? 'MySQL veritabanı oluşturulamadı.';
-
+        
         $this->notify($outputCallback, '✗ Database provision failed: ' . $message);
 
         throw new RuntimeException($message);

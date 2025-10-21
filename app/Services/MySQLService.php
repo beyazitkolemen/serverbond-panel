@@ -22,10 +22,22 @@ class MySQLService
         try {
             $identifier = $this->quoteIdentifier($this->normalizeIdentifier($databaseName));
 
-            return $this->connection()->statement(
+            $result = $this->connection()->statement(
                 "CREATE DATABASE IF NOT EXISTS {$identifier} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
             );
+
+            \Log::debug('MySQLService: createDatabase executed', [
+                'database' => $databaseName,
+                'identifier' => $identifier,
+                'result' => $result,
+            ]);
+
+            return $result;
         } catch (Throwable $e) {
+            \Log::error('MySQLService: createDatabase failed', [
+                'database' => $databaseName,
+                'error' => $e->getMessage(),
+            ]);
             return false;
         }
     }
@@ -35,11 +47,23 @@ class MySQLService
         try {
             $identifier = $this->formatUserIdentifier($username);
 
-            return $this->connection()->statement(
+            $result = $this->connection()->statement(
                 "CREATE USER IF NOT EXISTS {$identifier} IDENTIFIED BY ?",
                 [$password]
             );
+
+            \Log::debug('MySQLService: createUser executed', [
+                'user' => $username,
+                'identifier' => $identifier,
+                'result' => $result,
+            ]);
+
+            return $result;
         } catch (Throwable $e) {
+            \Log::error('MySQLService: createUser failed', [
+                'user' => $username,
+                'error' => $e->getMessage(),
+            ]);
             return false;
         }
     }
@@ -54,12 +78,30 @@ class MySQLService
                 "GRANT ALL PRIVILEGES ON {$database}.* TO {$user}"
             );
 
-            if (! $granted) {
+            if (!$granted) {
+                \Log::error('MySQLService: GRANT statement failed', [
+                    'database' => $databaseName,
+                    'user' => $username,
+                ]);
                 return false;
             }
 
-            return $this->connection()->statement('FLUSH PRIVILEGES');
+            $flushed = $this->connection()->statement('FLUSH PRIVILEGES');
+
+            \Log::debug('MySQLService: grantPrivileges executed', [
+                'database' => $databaseName,
+                'user' => $username,
+                'granted' => $granted,
+                'flushed' => $flushed,
+            ]);
+
+            return $flushed;
         } catch (Throwable $e) {
+            \Log::error('MySQLService: grantPrivileges failed', [
+                'database' => $databaseName,
+                'user' => $username,
+                'error' => $e->getMessage(),
+            ]);
             return false;
         }
     }
@@ -67,6 +109,18 @@ class MySQLService
     public function createDatabaseForSite(Site $site): array
     {
         try {
+            // MySQL bağlantısını test et
+            $connectionTest = $this->testConnection();
+            if (!$connectionTest['success']) {
+                \Log::error('MySQLService: MySQL connection failed', [
+                    'error' => $connectionTest['error'],
+                ]);
+                return [
+                    'success' => false,
+                    'error' => 'MySQL bağlantısı başarısız: ' . $connectionTest['error'],
+                ];
+            }
+
             // Site'de zaten database bilgileri var mı kontrol et
             $hasCredentials = !empty($site->database_name)
                 && !empty($site->database_user)
@@ -99,8 +153,13 @@ class MySQLService
 
             // MySQL'de database, user ve privileges oluştur (IF NOT EXISTS - idempotent)
             $databaseCreated = $this->createDatabase($dbName);
+            \Log::info('MySQLService: createDatabase result', ['success' => $databaseCreated, 'name' => $dbName]);
+
             $userCreated = $this->createUser($dbUser, $dbPassword);
+            \Log::info('MySQLService: createUser result', ['success' => $userCreated, 'user' => $dbUser]);
+
             $privilegesGranted = $this->grantPrivileges($dbName, $dbUser);
+            \Log::info('MySQLService: grantPrivileges result', ['success' => $privilegesGranted]);
 
             if ($databaseCreated && $userCreated && $privilegesGranted) {
                 // Yeni oluşturduysak site'ye kaydet
@@ -125,9 +184,20 @@ class MySQLService
                 ];
             }
 
+            \Log::error('MySQLService: Failed to create database components', [
+                'database_created' => $databaseCreated,
+                'user_created' => $userCreated,
+                'privileges_granted' => $privilegesGranted,
+            ]);
+
             return [
                 'success' => false,
-                'error' => 'Veritabanı, kullanıcı veya yetki oluşturulamadı.',
+                'error' => sprintf(
+                    'Veritabanı oluşturma başarısız (DB: %s, User: %s, Privileges: %s)',
+                    $databaseCreated ? 'OK' : 'FAIL',
+                    $userCreated ? 'OK' : 'FAIL',
+                    $privilegesGranted ? 'OK' : 'FAIL'
+                ),
             ];
         } catch (InvalidArgumentException $exception) {
             return [
