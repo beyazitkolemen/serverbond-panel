@@ -8,6 +8,7 @@ use App\Enums\SiteType;
 use App\Models\Deployment;
 use App\Models\Site;
 use App\Services\DeploymentService;
+use App\Services\MySQLService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
@@ -16,6 +17,23 @@ use Tests\TestCase;
 class DeploymentServiceTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->mock(MySQLService::class, function ($mock) {
+            $mock->shouldReceive('createDatabaseForSite')
+                ->andReturnUsing(function (Site $site): array {
+                    return [
+                        'success' => true,
+                        'database' => $site->database_name ?: 'example_database',
+                        'user' => $site->database_user ?: 'example_user',
+                        'password' => $site->database_password ?: 'secret',
+                    ];
+                });
+        });
+    }
 
     protected function tearDown(): void
     {
@@ -67,6 +85,12 @@ class DeploymentServiceTest extends TestCase
         $this->assertStringContainsString('Cloning repository...', $deployment->output);
         $this->assertStringContainsString('Checked out commit abcdef1', $deployment->output);
         $this->assertTrue(File::exists($rootDirectory . '/example.com/.env'));
+
+        $envContent = File::get($rootDirectory . '/example.com/.env');
+        $this->assertStringContainsString('DB_CONNECTION=mysql', $envContent);
+        $this->assertStringContainsString('DB_DATABASE=example', $envContent);
+        $this->assertStringContainsString('DB_USERNAME=example', $envContent);
+        $this->assertStringContainsString('DB_PASSWORD=secret', $envContent);
 
         Process::assertRan("git clone -b 'main' 'git@github.com:example/repo.git' .");
         Process::assertRan('git rev-parse HEAD');

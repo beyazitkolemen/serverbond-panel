@@ -7,7 +7,6 @@ namespace App\Services;
 use App\Models\Site;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\DatabaseManager;
-use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Throwable;
@@ -71,7 +70,7 @@ class MySQLService
             $dbName = $site->database_name ?: 'db_' . Str::slug($site->domain, '_');
             $dbUser = $site->database_user ?: 'user_' . Str::slug($site->domain, '_');
             $dbPassword = $site->database_password
-                ? $this->decryptPassword($site->database_password)
+                ? $site->database_password
                 : Str::random(32);
 
             $dbName = $this->normalizeIdentifier($dbName);
@@ -85,7 +84,7 @@ class MySQLService
                 $site->update([
                     'database_name' => $dbName,
                     'database_user' => $dbUser,
-                    'database_password' => Crypt::encryptString($dbPassword),
+                    'database_password' => $dbPassword,
                 ]);
 
                 return [
@@ -220,15 +219,6 @@ class MySQLService
     protected function connection(): ConnectionInterface
     {
         return $this->databaseManager->connection();
-    }
-
-    protected function decryptPassword(string $encrypted): string
-    {
-        try {
-            return Crypt::decryptString($encrypted);
-        } catch (Throwable $exception) {
-            return $encrypted;
-        }
     }
 
     /**

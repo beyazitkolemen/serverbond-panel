@@ -9,6 +9,7 @@ use App\Enums\DeploymentTrigger;
 use App\Enums\SiteStatus;
 use App\Models\Deployment;
 use App\Models\Site;
+use App\Services\EnvironmentService;
 use Illuminate\Process\ProcessResult;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
@@ -17,6 +18,10 @@ use Throwable;
 
 class DeploymentService
 {
+    public function __construct(
+        private readonly EnvironmentService $environmentService,
+    ) {}
+
     public function deploy(Site $site, DeploymentTrigger $trigger = DeploymentTrigger::Manual, ?int $userId = null): Deployment
     {
         $deployment = Deployment::create([
@@ -200,46 +205,13 @@ class DeploymentService
 
     protected function synchronizeEnvironmentFile(Site $site, string $rootPath, array &$output): void
     {
-        $envExamplePath = $rootPath . '/.env.example';
-        $envPath = $rootPath . '/.env';
-
-        if (File::exists($envExamplePath) && !File::exists($envPath)) {
-            File::copy($envExamplePath, $envPath);
-            $this->appendOutput($output, 'Copied .env.example to .env');
-
-            $savedEnvContent = $site->getEnvFile();
-            if ($savedEnvContent) {
-                File::put($envPath, $savedEnvContent);
-                $this->appendOutput($output, 'Updated .env with saved configuration from panel');
+        $this->environmentService->synchronizeEnvironmentFile(
+            $site,
+            $rootPath,
+            function (string $message) use (&$output): void {
+                $this->appendOutput($output, $message);
             }
-
-            return;
-        }
-
-        if (!File::exists($envPath)) {
-            $envContent = $site->getEnvFile();
-
-            if (!$envContent) {
-                $envContent = $site->getDefaultEnvContent();
-                $this->appendOutput($output, 'Created .env from default template');
-            } else {
-                $this->appendOutput($output, 'Created .env from panel configuration');
-            }
-
-            if ($envContent) {
-                File::put($envPath, $envContent);
-            }
-
-            return;
-        }
-
-        $savedEnvContent = $site->getEnvFile();
-        if ($savedEnvContent) {
-            File::put($envPath, $savedEnvContent);
-            $this->appendOutput($output, 'Updated existing .env from panel configuration');
-        } else {
-            $this->appendOutput($output, 'Using existing .env file');
-        }
+        );
     }
 
     protected function runProcess(
