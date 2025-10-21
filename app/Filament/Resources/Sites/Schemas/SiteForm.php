@@ -252,18 +252,6 @@ class SiteForm
                                         CodeEditor::make('env_content')
                                             ->label('.env Dosyası')
                                             ->helperText('Site deploy edildikten sonra .env dosyası otomatik oluşturulur veya güncellenir.')
-                                            ->placeholder('APP_NAME=Laravel
-APP_ENV=production
-APP_KEY=
-APP_DEBUG=false
-APP_URL=https://yourdomain.com
-
-DB_CONNECTION=mysql
-DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_DATABASE=your_database
-DB_USERNAME=your_username
-DB_PASSWORD=your_password')
                                             ->dehydrateStateUsing(fn($state) => $state)
                                             ->afterStateHydrated(function ($component, $state, $record) {
                                                 if ($record && $record->exists) {
