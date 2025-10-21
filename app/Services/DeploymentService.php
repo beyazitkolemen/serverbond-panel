@@ -123,6 +123,21 @@ class DeploymentService
 
                 // Site'yi refresh et
                 $site->refresh();
+
+                // Database tablosuna da kaydet
+                \App\Models\Database::updateOrCreate(
+                    ['name' => $result['database']],
+                    [
+                        'username' => $result['user'],
+                        'password' => $result['password'],
+                        'charset' => 'utf8mb4',
+                        'collation' => 'utf8mb4_unicode_ci',
+                        'site_id' => $site->id,
+                        'notes' => 'Deployment sırasında otomatik oluşturuldu',
+                    ]
+                );
+
+                $this->appendOutput($output, '✓ Database registered in panel');
             } else {
                 $this->appendOutput($output, '✗ Database creation failed: ' . ($result['error'] ?? 'Unknown error'));
             }
