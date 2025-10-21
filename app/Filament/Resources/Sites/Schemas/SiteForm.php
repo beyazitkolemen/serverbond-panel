@@ -7,6 +7,7 @@ namespace App\Filament\Resources\Sites\Schemas;
 use App\Enums\SiteStatus;
 use App\Enums\SiteType;
 use App\Models\Site;
+use App\Services\DeploymentScriptService;
 use App\Services\GitService;
 use Filament\Forms\Components\CodeEditor;
 use Filament\Forms\Components\Select;
@@ -177,15 +178,23 @@ class SiteForm
                                     ->columns(2),
 
                                 Section::make('Deployment Script')
-                                    ->description('Bu script, site deploy edildiğinde git pull sonrası otomatik olarak çalıştırılır.')
+                                    ->description('Deploy sırasında otomatik çalıştırılacak komutlar (composer install, npm build vb.)')
                                     ->schema([
                                         CodeEditor::make('deployment_script')
-                                            ->label('Deployment Script')
-                                            ->helperText('Site tipinize göre otomatik oluşturulmuştur. İhtiyacınıza göre düzenleyebilirsiniz.')
-                                            ->default(fn($get) => $get('type') ? Site::getDefaultDeploymentScript($get('type')) : '')
+                                            ->label('Bash Script')
+                                            ->helperText('Boş bırakılırsa site tipine göre varsayılan script kullanılır.')
+                                            ->default(function ($get) {
+                                                $type = $get('type');
+                                                if ($type) {
+                                                    $scriptService = app(DeploymentScriptService::class);
+                                                    return $scriptService->getDefaultScript($type);
+                                                }
+                                                return '';
+                                            })
                                             ->reactive()
                                             ->columnSpanFull(),
-                                    ]),
+                                    ])
+                                    ->collapsible(),
                             ]),
 
                         Tabs\Tab::make('Gelişmiş')
