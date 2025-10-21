@@ -6,10 +6,13 @@ namespace App\Models;
 
 use App\Enums\SiteStatus;
 use App\Enums\SiteType;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Crypt;
+use Throwable;
 
 class Site extends Model
 {
@@ -96,6 +99,29 @@ class Site extends Model
                 $site->saveEnvFile(request('env_content'));
             }
         });
+    }
+
+    protected function databasePassword(): Attribute
+    {
+        return Attribute::make(
+            get: fn (?string $value) => $this->decryptDatabasePassword($value),
+            set: fn (?string $value) => $value !== null && $value !== ''
+                ? Crypt::encryptString($value)
+                : null,
+        );
+    }
+
+    protected function decryptDatabasePassword(?string $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return $value;
+        }
+
+        try {
+            return Crypt::decryptString($value);
+        } catch (Throwable) {
+            return $value;
+        }
     }
 
     public static function getDefaultDeploymentScript(SiteType $type): string
