@@ -14,6 +14,40 @@ class EnvironmentService
     {
         File::ensureDirectoryExists($rootPath);
 
+        $envPath = $rootPath . '/.env';
+        $envExists = File::exists($envPath);
+
+        // Eğer .env dosyası zaten varsa, sadece database bilgilerini güncelle
+        if ($envExists) {
+            $this->notify($outputCallback, '✓ Existing .env file found, updating database credentials only...');
+
+            // Mevcut .env içeriğini al
+            $envContent = (string) File::get($envPath);
+
+            // Database bilgileri varsa uygula
+            if ($site->database_name && $site->database_user && $site->database_password) {
+                $credentials = [
+                    'connection' => config('deployment.database.connection'),
+                    'host' => config('deployment.database.host'),
+                    'port' => config('deployment.database.port'),
+                    'database' => $site->database_name,
+                    'username' => $site->database_user,
+                    'password' => $site->database_password,
+                ];
+
+                $envContent = $this->applyDatabaseConfiguration($envContent, $credentials);
+                File::put($envPath, $envContent);
+                $this->notify($outputCallback, '✓ Database credentials updated in existing .env file');
+            } else {
+                $this->notify($outputCallback, '✓ .env file exists, no database credentials to update');
+            }
+
+            return;
+        }
+
+        // .env dosyası yoksa yeni oluştur
+        $this->notify($outputCallback, '📝 Creating new .env file...');
+
         // Base content al (template bilgileri ile)
         $envContent = $this->resolveBaseEnvironmentContent($site, $rootPath, $outputCallback);
 
@@ -35,30 +69,25 @@ class EnvironmentService
             $this->notify($outputCallback, 'No database credentials found, using template defaults...');
         }
 
-        // .env dosyasına yaz
-        File::put($rootPath . '/.env', $envContent);
+        // Yeni .env dosyasını oluştur
+        File::put($envPath, $envContent);
 
-        $this->notify($outputCallback, '.env file synchronized successfully.');
+        $this->notify($outputCallback, '✓ New .env file created successfully');
     }
 
 
     private function resolveBaseEnvironmentContent(Site $site, string $rootPath, ?callable $outputCallback): string
     {
-        $envPath = $rootPath . '/.env';
         $envExamplePath = $rootPath . '/.env.example';
 
-        if (File::exists($envPath)) {
-            $this->notify($outputCallback, 'Existing .env file found, merging configuration.');
-
-            return (string) File::get($envPath);
-        }
-
+        // .env.example varsa onu kullan
         if (File::exists($envExamplePath)) {
             $this->notify($outputCallback, 'Using .env.example as base configuration.');
 
             return (string) File::get($envExamplePath);
         }
 
+        // Site tipine göre default template oluştur
         $defaultContent = $site->getDefaultEnvContent();
 
         if ($defaultContent !== '') {
