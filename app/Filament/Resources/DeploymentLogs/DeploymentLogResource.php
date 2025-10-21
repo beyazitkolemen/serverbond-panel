@@ -10,6 +10,7 @@ use App\Models\DeploymentLog;
 use Filament\Resources\Resource;
 use UnitEnum;
 use BackedEnum;
+use Filament\Tables\Table;
 
 class DeploymentLogResource extends Resource
 {
@@ -24,6 +25,11 @@ class DeploymentLogResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Deployment Logları';
     protected static ?int $navigationSort = 3;
+
+    public static function table(Table $table): Table
+    {
+        return DeploymentLogsTable::configure($table);
+    }
 
     public static function getPages(): array
     {
