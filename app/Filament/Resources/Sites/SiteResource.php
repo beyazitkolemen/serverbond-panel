@@ -32,7 +32,7 @@ class SiteResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Siteler';
 
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = null; // Null = en üstte gösterir
 
     public static function form(Schema $schema): Schema
     {

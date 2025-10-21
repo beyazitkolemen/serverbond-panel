@@ -26,10 +26,10 @@ class SiteForm
             ->components([
                 Tabs::make('Site Configuration')
                     ->tabs([
-                        Tabs\Tab::make('Genel Bilgiler')
+                        Tabs\Tab::make('Temel Bilgiler')
                             ->icon('heroicon-o-information-circle')
                             ->schema([
-                                Section::make()
+                                Section::make('Site Detayları')
                                     ->schema([
                                         TextInput::make('name')
                                             ->label('Site Adı')
@@ -63,12 +63,8 @@ class SiteForm
                                             ->native(false),
                                     ])
                                     ->columns(2),
-                            ]),
 
-                        Tabs\Tab::make('Dizin Ayarları')
-                            ->icon('heroicon-o-folder')
-                            ->schema([
-                                Section::make()
+                                Section::make('Dizin Ayarları')
                                     ->schema([
                                         TextInput::make('root_directory')
                                             ->label('Ana Dizin')
@@ -96,10 +92,10 @@ class SiteForm
                                     ->columns(2),
                             ]),
 
-                        Tabs\Tab::make('Git Ayarları')
+                        Tabs\Tab::make('Git & Deployment')
                             ->icon('heroicon-o-code-bracket')
                             ->schema([
-                                Section::make()
+                                Section::make('Git Repository')
                                     ->schema([
                                         TextInput::make('git_repository')
                                             ->label('Git Repository')
@@ -168,7 +164,7 @@ class SiteForm
                                             ->preload(),
 
                                         Textarea::make('git_deploy_key')
-                                            ->label('Deploy Key')
+                                            ->label('Deploy Key (Opsiyonel)')
                                             ->rows(5)
                                             ->placeholder('-----BEGIN RSA PRIVATE KEY-----')
                                             ->helperText('Private repository için SSH deploy key'),
@@ -179,13 +175,24 @@ class SiteForm
                                             ->helperText('Git push sonrası otomatik deployment'),
                                     ])
                                     ->columns(2),
+
+                                Section::make('Deployment Script')
+                                    ->description('Bu script, site deploy edildiğinde git pull sonrası otomatik olarak çalıştırılır.')
+                                    ->schema([
+                                        CodeEditor::make('deployment_script')
+                                            ->label('Deployment Script')
+                                            ->helperText('Site tipinize göre otomatik oluşturulmuştur. İhtiyacınıza göre düzenleyebilirsiniz.')
+                                            ->default(fn($get) => $get('type') ? Site::getDefaultDeploymentScript($get('type')) : '')
+                                            ->reactive()
+                                            ->columnSpanFull(),
+                                    ]),
                             ]),
 
-                        Tabs\Tab::make('Database')
-                            ->icon('heroicon-o-circle-stack')
+                        Tabs\Tab::make('Gelişmiş')
+                            ->icon('heroicon-o-cog-6-tooth')
                             ->schema([
-                                Section::make()
-                                    ->description('Bu alanlar boş bırakılırsa otomatik oluşturulur.')
+                                Section::make('Database')
+                                    ->description('Bu alanlar boş bırakılırsa deployment sırasında otomatik oluşturulur.')
                                     ->schema([
                                         TextInput::make('database_name')
                                             ->label('Database Adı')
@@ -207,46 +214,26 @@ class SiteForm
                                             ->revealable()
                                             ->placeholder('Otomatik oluşturulacak'),
                                     ])
-                                    ->columns(2),
-                            ]),
+                                    ->columns(3)
+                                    ->collapsible(),
 
-                        Tabs\Tab::make('SSL & Güvenlik')
-                            ->icon('heroicon-o-shield-check')
-                            ->schema([
-                                Section::make()
+                                Section::make('SSL & Güvenlik')
                                     ->schema([
                                         Toggle::make('ssl_enabled')
                                             ->label('SSL Etkin')
                                             ->default(false)
-                                            ->helperText("Let's Encrypt SSL sertifikası"),
+                                            ->helperText("Let's Encrypt SSL sertifikası")
+                                            ->inline(false),
 
                                         TextInput::make('deploy_webhook_token')
                                             ->label('Webhook Token')
                                             ->disabled()
                                             ->helperText('Otomatik oluşturulacak'),
                                     ])
-                                    ->columns(2),
-                            ]),
+                                    ->columns(2)
+                                    ->collapsible(),
 
-                        Tabs\Tab::make('Deployment Script')
-                            ->icon('heroicon-o-command-line')
-                            ->schema([
-                                Section::make()
-                                    ->description('Bu script, site deploy edildiğinde git pull sonrası otomatik olarak çalıştırılır.')
-                                    ->schema([
-                                        CodeEditor::make('deployment_script')
-                                            ->label('Deployment Script')
-                                            ->helperText('Site tipinize göre otomatik oluşturulmuştur. İhtiyacınıza göre düzenleyebilirsiniz.')
-                                            ->default(fn($get) => $get('type') ? Site::getDefaultDeploymentScript($get('type')) : '')
-                                            ->reactive()
-                                            ->columnSpanFull(),
-                                    ]),
-                            ]),
-
-                        Tabs\Tab::make('Environment (.env)')
-                            ->icon('heroicon-o-cog-6-tooth')
-                            ->schema([
-                                Section::make()
+                                Section::make('Environment (.env)')
                                     ->description('Site\'nin .env dosyasını buradan düzenleyebilirsiniz. Deploy sonrası geçerli olur.')
                                     ->schema([
                                         CodeEditor::make('env_content')
@@ -267,17 +254,18 @@ class SiteForm
                                                 }
                                             })
                                             ->columnSpanFull(),
-                                    ]),
-                            ]),
+                                    ])
+                                    ->collapsible(),
 
-                        Tabs\Tab::make('Notlar')
-                            ->icon('heroicon-o-document-text')
-                            ->schema([
-                                Textarea::make('notes')
-                                    ->label('Notlar')
-                                    ->rows(5)
-                                    ->placeholder('Bu site hakkında notlar...')
-                                    ->columnSpanFull(),
+                                Section::make('Notlar')
+                                    ->schema([
+                                        Textarea::make('notes')
+                                            ->label('Notlar')
+                                            ->rows(5)
+                                            ->placeholder('Bu site hakkında notlar...')
+                                            ->columnSpanFull(),
+                                    ])
+                                    ->collapsible(),
                             ]),
                     ])
                     ->columnSpanFull(),
