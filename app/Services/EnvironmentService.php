@@ -38,17 +38,21 @@ class EnvironmentService
 
     private function provisionDatabase(Site $site, ?callable $outputCallback): array
     {
-        $this->notify($outputCallback, 'Ensuring MySQL database is provisioned...');
+        $this->notify($outputCallback, 'Provisioning MySQL database...');
 
         $result = $this->mySQLService->createDatabaseForSite($site);
 
         if (($result['success'] ?? false) === true) {
             $this->notify(
                 $outputCallback,
-                sprintf('Database created/verified (name: %s, user: %s).', $result['database'], $result['user'])
+                sprintf('✓ Database ready: %s@%s (password: %d chars)',
+                    $result['user'],
+                    $result['database'],
+                    strlen($result['password'])
+                )
             );
 
-            // Plain text password'ü direkt döndür (MySQLService'den gelen)
+            // Plain text credentials döndür (MySQL'de kullanılan)
             return [
                 'connection' => config('deployment.database.connection'),
                 'host' => config('deployment.database.host'),
@@ -59,23 +63,10 @@ class EnvironmentService
             ];
         }
 
-        if ($site->database_name && $site->database_user && $site->database_password) {
-            $this->notify($outputCallback, 'Using existing database credentials stored for the site.');
-
-            // Site'den oku - plain text şifre
-            $password = $site->database_password;
-
-            return [
-                'connection' => config('deployment.database.connection'),
-                'host' => config('deployment.database.host'),
-                'port' => config('deployment.database.port'),
-                'database' => $site->database_name,
-                'username' => $site->database_user,
-                'password' => $password, // Plain text password
-            ];
-        }
-
+        // MySQLService başarısız oldu, hata ver
         $message = $result['error'] ?? 'MySQL veritabanı oluşturulamadı.';
+
+        $this->notify($outputCallback, '✗ Database provision failed: ' . $message);
 
         throw new RuntimeException($message);
     }
@@ -112,20 +103,40 @@ class EnvironmentService
 
     private function applyDatabaseConfiguration(string $envContent, array $credentials): string
     {
-        // Sadece database bilgileri varsa yaz
-        if (!empty($credentials['database']) && !empty($credentials['username'])) {
-            $envContent = $this->setEnvValue($envContent, 'DB_CONNECTION', $credentials['connection']);
-            $envContent = $this->setEnvValue($envContent, 'DB_HOST', $credentials['host']);
-            $envContent = $this->setEnvValue($envContent, 'DB_PORT', (string) $credentials['port']);
-            $envContent = $this->setEnvValue($envContent, 'DB_DATABASE', $credentials['database']);
-            $envContent = $this->setEnvValue($envContent, 'DB_USERNAME', $credentials['username']);
-            $envContent = $this->setEnvValue($envContent, 'DB_PASSWORD', $credentials['password'] ?? '');
+        \Log::info('EnvironmentService: Applying database config', [
+            'credentials' => [
+                'connection' => $credentials['connection'] ?? 'N/A',
+                'host' => $credentials['host'] ?? 'N/A',
+                'port' => $credentials['port'] ?? 'N/A',
+                'database' => $credentials['database'] ?? 'EMPTY',
+                'username' => $credentials['username'] ?? 'EMPTY',
+                'password_length' => isset($credentials['password']) ? strlen($credentials['password']) : 0,
+            ]
+        ]);
 
-            $this->notify($outputCallback ?? null, sprintf('Database configured: %s@%s',
-                $credentials['username'],
-                $credentials['database']
-            ));
+        // Database bilgileri var mı kontrol et
+        if (empty($credentials['database']) || empty($credentials['username'])) {
+            \Log::warning('EnvironmentService: Database config skipped - missing credentials', [
+                'database_empty' => empty($credentials['database']),
+                'username_empty' => empty($credentials['username']),
+            ]);
+            return $envContent;
         }
+
+        // Password kontrolü
+        if (empty($credentials['password'])) {
+            \Log::error('EnvironmentService: Password is empty!');
+        }
+
+        // Her bir değeri tek tek yaz ve log tut
+        $envContent = $this->setEnvValue($envContent, 'DB_CONNECTION', $credentials['connection']);
+        $envContent = $this->setEnvValue($envContent, 'DB_HOST', $credentials['host']);
+        $envContent = $this->setEnvValue($envContent, 'DB_PORT', (string) $credentials['port']);
+        $envContent = $this->setEnvValue($envContent, 'DB_DATABASE', $credentials['database']);
+        $envContent = $this->setEnvValue($envContent, 'DB_USERNAME', $credentials['username']);
+        $envContent = $this->setEnvValue($envContent, 'DB_PASSWORD', $credentials['password'] ?? '');
+
+        \Log::info('EnvironmentService: Database config applied successfully');
 
         return $envContent;
     }
@@ -135,19 +146,18 @@ class EnvironmentService
         $normalizedValue = $this->normalizeEnvValue($value);
 
         // Daha esnek pattern - boşluk, comment vb. yakalar
-        // Satır başında optional whitespace + key + optional whitespace + = + herhangi bir şey
         $pattern = '/^[\s]*' . preg_quote($key, '/') . '[\s]*=.*$/m';
 
         // Eğer key mevcutsa değiştir
         if (preg_match($pattern, $content) === 1) {
-            // Değiştirirken clean format kullan (boşluksuz)
             $replaced = (string) preg_replace($pattern, $key . '=' . $normalizedValue, $content);
+            \Log::debug("ENV: Updated {$key}", ['value' => $normalizedValue]);
             return $replaced;
         }
 
         // Key yoksa - DB_ ile başlayan section'ı bul ve orada ekle
         if (str_starts_with($key, 'DB_')) {
-            // DB section'ını bul
+            // DB section'ını bul (son DB_ değerinden sonra)
             $dbSectionPattern = '/(DB_[A-Z_]+\s*=.*?)(\n\s*\n)/s';
 
             if (preg_match($dbSectionPattern, $content)) {
@@ -156,6 +166,7 @@ class EnvironmentService
                 $newContent = preg_replace($dbSectionPattern, $replacement, $content, 1);
 
                 if ($newContent !== null && $newContent !== $content) {
+                    \Log::debug("ENV: Added {$key} to DB section", ['value' => $normalizedValue]);
                     return $newContent;
                 }
             }
@@ -167,6 +178,7 @@ class EnvironmentService
             $content .= PHP_EOL;
         }
 
+        \Log::debug("ENV: Added {$key} to end", ['value' => $normalizedValue]);
         return $content . $key . '=' . $normalizedValue . PHP_EOL;
     }
 

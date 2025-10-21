@@ -62,6 +62,7 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->authMiddleware([
                 Authenticate::class,
-            ])->maxContentWidth(Width::Full);
+            ])->maxContentWidth(Width::Full)->plugin(\Boquizo\FilamentLogViewer\FilamentLogViewerPlugin::make())
+            ;
     }
 }
