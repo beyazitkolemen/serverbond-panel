@@ -53,12 +53,7 @@ class Site extends Model
         'last_deployed_at' => 'datetime',
     ];
 
-    protected $hidden = [
-        'database_password',
-        'git_deploy_key',
-        'deploy_webhook_token',
-        'cloudflare_tunnel_token',
-    ];
+
 
     public function deployments(): HasMany
     {
