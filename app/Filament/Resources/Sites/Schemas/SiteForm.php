@@ -73,10 +73,8 @@ class SiteForm
                                         TextInput::make('root_directory')
                                             ->label('Ana Dizin')
                                             ->required()
-                                            ->default(fn() => env('APP_ENV') === 'local'
-                                                ? storage_path('app/sites')
-                                                : '/var/www')
-                                            ->helperText('Site dosyalarının ana dizini (local: storage/app/sites, production: /var/www)'),
+                                            ->default('/srv/serverbond/sites')
+                                            ->helperText('Tüm siteler /srv/serverbond/sites dizinine kurulur'),
 
                                         TextInput::make('public_directory')
                                             ->label('Public Dizin')
