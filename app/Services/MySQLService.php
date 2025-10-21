@@ -48,24 +48,31 @@ class MySQLService
             // % wildcard kullan - tüm host'lardan erişim için
             $identifier = $this->formatUserIdentifier($username, '%');
 
+            \Log::info('MySQLService: Attempting to create user', [
+                'username' => $username,
+                'identifier' => $identifier,
+                'password_length' => strlen($password),
+            ]);
+
             $result = $this->connection()->statement(
                 "CREATE USER IF NOT EXISTS {$identifier} IDENTIFIED BY ?",
                 [$password]
             );
 
-            \Log::debug('MySQLService: createUser executed', [
+            \Log::info('MySQLService: createUser result', [
                 'user' => $username,
                 'identifier' => $identifier,
-                'result' => $result,
+                'success' => $result,
             ]);
 
             return $result;
         } catch (Throwable $e) {
-            \Log::error('MySQLService: createUser failed', [
+            \Log::error('MySQLService: createUser EXCEPTION', [
                 'user' => $username,
                 'identifier' => $identifier ?? 'N/A',
                 'error' => $e->getMessage(),
                 'code' => $e->getCode(),
+                'trace' => $e->getTraceAsString(),
             ]);
             return false;
         }
@@ -173,8 +180,8 @@ class MySQLService
             $privilegesGranted = $this->grantPrivileges($dbName, $dbUser);
             \Log::info('MySQLService: grantPrivileges result', ['success' => $privilegesGranted]);
 
-            // En az database oluşturulduysa devam et (user/privileges opsiyonel olabilir)
-            if ($databaseCreated) {
+            // HEPSI başarılı olmalı - eksik olursa kullanılamaz
+            if ($databaseCreated && $userCreated && $privilegesGranted) {
                 // Yeni oluşturduysak site'ye kaydet
                 if (!$hasCredentials) {
                     $site->update([
@@ -185,18 +192,8 @@ class MySQLService
 
                     \Log::info('MySQLService: Saved credentials to site', [
                         'site_id' => $site->id,
-                        'db_created' => $databaseCreated,
-                        'user_created' => $userCreated,
-                        'privileges_granted' => $privilegesGranted,
-                    ]);
-                }
-
-                // User veya privileges başarısız olduysa uyar
-                if (!$userCreated || !$privilegesGranted) {
-                    \Log::warning('MySQLService: Partial success - database created but user/privileges may have issues', [
-                        'database_created' => $databaseCreated,
-                        'user_created' => $userCreated,
-                        'privileges_granted' => $privilegesGranted,
+                        'db' => $dbName,
+                        'user' => $dbUser,
                     ]);
                 }
 
@@ -206,7 +203,6 @@ class MySQLService
                     'database' => $dbName,
                     'user' => $dbUser,
                     'password' => $dbPassword, // Plain text
-                    'partial' => !$userCreated || !$privilegesGranted,
                 ];
             }
 
