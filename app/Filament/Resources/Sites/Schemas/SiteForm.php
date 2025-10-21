@@ -27,7 +27,7 @@ class SiteForm
             ->components([
                 Tabs::make('Site Configuration')
                     ->tabs([
-                        Tabs\Tab::make('Temel Bilgiler')
+                        Tabs\Tab::make('Genel')
                             ->icon('heroicon-o-information-circle')
                             ->schema([
                                 Section::make('Site Detayları')
@@ -96,10 +96,10 @@ class SiteForm
                                     ->columns(2),
                             ]),
 
-                        Tabs\Tab::make('Git & Deployment')
+                        Tabs\Tab::make('Git Repository')
                             ->icon('heroicon-o-code-bracket')
                             ->schema([
-                                Section::make('Git Repository')
+                                Section::make('Repository Ayarları')
                                     ->schema([
                                         TextInput::make('git_repository')
                                             ->label('Git Repository')
@@ -179,12 +179,16 @@ class SiteForm
                                             ->helperText('Git push sonrası otomatik deployment'),
                                     ])
                                     ->columns(2),
+                            ]),
 
-                                Section::make('Deployment Script')
-                                    ->description('Deploy sırasında otomatik çalıştırılacak komutlar (composer install, npm build vb.)')
+                        Tabs\Tab::make('Deployment Script')
+                            ->icon('heroicon-o-command-line')
+                            ->schema([
+                                Section::make('Bash Script')
+                                    ->description('Deploy sırasında otomatik çalıştırılacak komutlar (composer install, migration, npm build vb.)')
                                     ->schema([
                                         CodeEditor::make('deployment_script')
-                                            ->label('Bash Script')
+                                            ->label('Script İçeriği')
                                             ->helperText('Boş bırakılırsa site tipine göre varsayılan script kullanılır.')
                                             ->default(function ($get) {
                                                 $type = $get('type');
@@ -196,15 +200,42 @@ class SiteForm
                                             })
                                             ->reactive()
                                             ->columnSpanFull(),
+                                    ]),
+                            ]),
+
+                        Tabs\Tab::make('Environment (.env)')
+                            ->icon('heroicon-o-document-text')
+                            ->schema([
+                                Section::make('.env Dosyası')
+                                    ->description('Site deploy edildikten sonra .env dosyasını buradan düzenleyebilirsiniz.')
+                                    ->schema([
+                                        CodeEditor::make('env_content')
+                                            ->label('Dosya İçeriği')
+                                            ->helperText('Deploy edildiğinde veya güncellendiğinde sadece database bilgileri otomatik güncellenir, diğer değişiklikleriniz korunur.')
+                                            ->dehydrateStateUsing(fn($state) => $state)
+                                            ->afterStateHydrated(function ($component, $state, $record) {
+                                                if ($record && $record->exists) {
+                                                    // Site'nin .env dosyasını oku
+                                                    $envContent = $record->getEnvFile();
+
+                                                    if ($envContent) {
+                                                        $component->state($envContent);
+                                                    } else {
+                                                        // Yoksa template oluştur
+                                                        $component->state($record->getDefaultEnvContent());
+                                                    }
+                                                }
+                                            })
+                                            ->columnSpanFull(),
                                     ])
-                                    ->collapsible(),
+                                    ->visible(fn($record) => $record !== null && $record->exists),
                             ]),
 
                         Tabs\Tab::make('Gelişmiş')
                             ->icon('heroicon-o-cog-6-tooth')
                             ->schema([
                                 Section::make('Database Bilgileri')
-                                    ->description('Deployment sonrası oluşturulan database bilgilerini buradan görebilirsiniz.')
+                                    ->description('Deployment sonrası otomatik oluşturulan database bilgileri')
                                     ->schema([
                                         TextInput::make('database_name')
                                             ->label('Database Adı')
@@ -231,7 +262,6 @@ class SiteForm
                                     ])
                                     ->columns(3)
                                     ->collapsible()
-                                    ->collapsed()
                                     ->visible(fn($record) => $record !== null && $record->exists && $record->database_name),
 
                                 Section::make('SSL & Güvenlik')
@@ -278,33 +308,7 @@ class SiteForm
                                             ->visible(fn($get) => $get('cloudflare_tunnel_enabled') === true),
                                     ])
                                     ->columns(2)
-                                    ->collapsible()
-                                    ->collapsed(),
-
-                                Section::make('Environment (.env)')
-                                    ->description('Site deploy edildikten sonra .env dosyasını buradan düzenleyebilirsiniz.')
-                                    ->schema([
-                                        CodeEditor::make('env_content')
-                                            ->label('.env Dosyası')
-                                            ->helperText('Deployment sırasında bu içerik .env dosyasına yazılacaktır.')
-                                            ->dehydrateStateUsing(fn($state) => $state)
-                                            ->afterStateHydrated(function ($component, $state, $record) {
-                                                if ($record && $record->exists) {
-                                                    // Site'nin .env dosyasını oku
-                                                    $envContent = $record->getEnvFile();
-
-                                                    if ($envContent) {
-                                                        $component->state($envContent);
-                                                    } else {
-                                                        // Yoksa template oluştur
-                                                        $component->state($record->getDefaultEnvContent());
-                                                    }
-                                                }
-                                            })
-                                            ->columnSpanFull(),
-                                    ])
-                                    ->collapsible()
-                                    ->visible(fn($record) => $record !== null && $record->exists),
+                                    ->collapsible(),
 
                                 Section::make('Notlar')
                                     ->schema([
