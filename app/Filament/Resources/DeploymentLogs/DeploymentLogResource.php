@@ -8,27 +8,22 @@ use App\Filament\Resources\DeploymentLogs\Pages\ListDeploymentLogs;
 use App\Filament\Resources\DeploymentLogs\Tables\DeploymentLogsTable;
 use App\Models\DeploymentLog;
 use Filament\Resources\Resource;
+use UnitEnum;
+use BackedEnum;
 
 class DeploymentLogResource extends Resource
 {
     protected static ?string $model = DeploymentLog::class;
+    protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-rectangle-stack';
 
-    protected static ?string $navigationIcon = 'heroicon-o-document-text';
+    protected static string|UnitEnum|null $navigationGroup = 'Site Yönetimi';
 
     protected static ?string $navigationLabel = 'Deployment Logları';
 
     protected static ?string $modelLabel = 'Deployment Log';
 
     protected static ?string $pluralModelLabel = 'Deployment Logları';
-
-    protected static ?string $navigationGroup = 'Site Yönetimi';
-
-    protected static ?int $navigationSort = 4;
-
-    public static function table(\Filament\Tables\Table $table): \Filament\Tables\Table
-    {
-        return DeploymentLogsTable::make($table);
-    }
+    protected static ?int $navigationSort = 3;
 
     public static function getPages(): array
     {
