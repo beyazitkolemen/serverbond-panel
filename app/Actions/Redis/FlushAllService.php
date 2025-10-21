@@ -1,0 +1,18 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Actions\Redis;
+
+use App\Actions\BaseServerBondService;
+
+class FlushAllService extends BaseServerBondService
+{
+    /**
+     * Clear all Redis data (requires confirmation)
+     */
+    public function execute(): array
+    {
+        return $this->executeScript($this->getScriptPath('redis', 'flush_all'));
+    }
+}
