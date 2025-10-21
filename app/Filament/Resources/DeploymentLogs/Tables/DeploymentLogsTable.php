@@ -4,57 +4,76 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\DeploymentLogs\Tables;
 
-use Filament\Tables;
+use Filament\Forms\Components\DatePicker;
+use Filament\Tables\Actions\BulkActionGroup;
+use Filament\Tables\Actions\DeleteAction;
+use Filament\Tables\Actions\DeleteBulkAction;
+use Filament\Tables\Actions\ViewAction;
+use Filament\Tables\Columns\BadgeColumn;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\Filter;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 
 class DeploymentLogsTable
 {
-    public static function make(Table $table): Table
+    public static function configure(Table $table): Table
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('id')
-                    ->label('ID')
+                TextColumn::make('id')
+                    ->label('#')
                     ->sortable()
                     ->searchable(),
 
-                Tables\Columns\TextColumn::make('site.name')
+                TextColumn::make('site.name')
                     ->label('Site')
                     ->sortable()
                     ->searchable()
+                    ->weight('bold')
+                    ->icon('heroicon-o-globe-alt')
                     ->url(fn ($record) => $record->site ? route('filament.admin.resources.sites.edit', $record->site) : null),
 
-                Tables\Columns\TextColumn::make('deployment.id')
+                TextColumn::make('deployment.id')
                     ->label('Deployment #')
                     ->sortable()
                     ->searchable()
+                    ->placeholder('-')
                     ->url(fn ($record) => $record->deployment ? route('filament.admin.resources.deployments.edit', $record->deployment) : null),
 
-                Tables\Columns\BadgeColumn::make('level')
+                BadgeColumn::make('level')
                     ->label('Seviye')
+                    ->formatStateUsing(fn ($state) => ucfirst($state))
                     ->colors([
                         'success' => 'success',
                         'info' => 'info',
                         'warning' => 'warning',
                         'danger' => 'error',
                     ])
+                    ->icons([
+                        'heroicon-o-check-circle' => 'success',
+                        'heroicon-o-information-circle' => 'info',
+                        'heroicon-o-exclamation-triangle' => 'warning',
+                        'heroicon-o-x-circle' => 'error',
+                    ])
                     ->sortable(),
 
-                Tables\Columns\TextColumn::make('message')
+                TextColumn::make('message')
                     ->label('Mesaj')
-                    ->limit(100)
+                    ->limit(80)
                     ->searchable()
                     ->wrap()
                     ->tooltip(fn ($record) => $record->message),
 
-                Tables\Columns\TextColumn::make('created_at')
+                TextColumn::make('created_at')
                     ->label('Tarih')
-                    ->dateTime('d/m/Y H:i:s')
-                    ->sortable(),
+                    ->dateTime('d M Y, H:i')
+                    ->sortable()
+                    ->toggleable(),
             ])
             ->filters([
-                Tables\Filters\SelectFilter::make('level')
+                SelectFilter::make('level')
                     ->label('Seviye')
                     ->options([
                         'info' => 'Info',
@@ -64,17 +83,17 @@ class DeploymentLogsTable
                     ])
                     ->multiple(),
 
-                Tables\Filters\SelectFilter::make('site_id')
+                SelectFilter::make('site_id')
                     ->label('Site')
                     ->relationship('site', 'name')
                     ->searchable()
                     ->preload(),
 
-                Tables\Filters\Filter::make('created_at')
+                Filter::make('created_at')
                     ->form([
-                        \Filament\Forms\Components\DatePicker::make('created_from')
+                        DatePicker::make('created_from')
                             ->label('Başlangıç Tarihi'),
-                        \Filament\Forms\Components\DatePicker::make('created_until')
+                        DatePicker::make('created_until')
                             ->label('Bitiş Tarihi'),
                     ])
                     ->query(function (Builder $query, array $data): Builder {
@@ -90,17 +109,17 @@ class DeploymentLogsTable
                     }),
             ])
             ->actions([
-                Tables\Actions\ViewAction::make()
+                ViewAction::make()
                     ->modalHeading(fn ($record) => 'Log Detayı #' . $record->id)
                     ->modalContent(fn ($record) => view('filament.resources.deployment-logs.view-log', [
                         'record' => $record,
                     ])),
 
-                Tables\Actions\DeleteAction::make(),
+                DeleteAction::make(),
             ])
             ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
                 ]),
             ])
             ->defaultSort('created_at', 'desc')
