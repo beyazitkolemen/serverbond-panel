@@ -283,33 +283,6 @@ class SiteForm
                                     ->columns(2)
                                     ->collapsible(),
 
-                                Section::make('Cloudflare Tunnel')
-                                    ->description('Cloudflare Tunnel ile sitenizi internete açın (cloudflared gereklidir)')
-                                    ->schema([
-                                        Toggle::make('cloudflare_tunnel_enabled')
-                                            ->label('Cloudflare Tunnel Aktif')
-                                            ->helperText('Site deploy edildiğinde tunnel otomatik başlatılır')
-                                            ->default(false)
-                                            ->live()
-                                            ->columnSpanFull(),
-
-                                        Textarea::make('cloudflare_tunnel_token')
-                                            ->label('Tunnel Token')
-                                            ->placeholder('Cloudflare Dashboard\'dan tunnel token\'ınızı buraya yapıştırın')
-                                            ->rows(3)
-                                            ->helperText('Token formatı: eyJhIjoiXXXXX... şeklinde olmalıdır')
-                                            ->visible(fn($get) => $get('cloudflare_tunnel_enabled') === true)
-                                            ->columnSpanFull(),
-
-                                        TextInput::make('cloudflare_tunnel_id')
-                                            ->label('Tunnel ID (Opsiyonel)')
-                                            ->placeholder('Cloudflare tunnel ID')
-                                            ->helperText('Token kullanıyorsanız bu alan opsiyoneldir')
-                                            ->visible(fn($get) => $get('cloudflare_tunnel_enabled') === true),
-                                    ])
-                                    ->columns(2)
-                                    ->collapsible(),
-
                                 Section::make('Notlar')
                                     ->schema([
                                         Textarea::make('notes')

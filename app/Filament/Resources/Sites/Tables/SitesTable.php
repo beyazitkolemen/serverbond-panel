@@ -7,11 +7,13 @@ namespace App\Filament\Resources\Sites\Tables;
 use App\Enums\DeploymentTrigger;
 use App\Enums\SiteStatus;
 use App\Enums\SiteType;
+use App\Services\CloudflareService;
 use App\Services\DeploymentService;
 use App\Services\MySQLService;
 use App\Services\NginxService;
 use App\Services\RedisService;
 use Filament\Actions\Action;
+use Filament\Forms\Components\Textarea;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
@@ -100,6 +102,15 @@ class SitesTable
                     ->falseColor('gray')
                     ->toggleable(),
 
+                IconColumn::make('cloudflare_tunnel_enabled')
+                    ->label('CF Tunnel')
+                    ->boolean()
+                    ->trueIcon('heroicon-o-cloud')
+                    ->falseIcon('heroicon-o-cloud-arrow-down')
+                    ->trueColor('info')
+                    ->falseColor('gray')
+                    ->toggleable(),
+
                 TextColumn::make('last_deployed_at')
                     ->label('Son Deploy')
                     ->dateTime('d M Y, H:i')
@@ -162,7 +173,87 @@ class SitesTable
                     })
                     ->visible(fn ($record) => $record->git_repository),
 
+                Action::make('configureCloudflareTunnel')
+                    ->label('Cloudflare Tunnel')
+                    ->icon('heroicon-o-cloud')
+                    ->color('info')
+                    ->modalHeading('Cloudflare Tunnel Aktifleştir')
+                    ->modalDescription('Cloudflare Dashboard\'dan aldığınız tunnel token\'ı girerek tunnel\'ı hemen aktifleştirebilirsiniz.')
+                    ->modalSubmitActionLabel('Aktifleştir')
+                    ->form([
+                        Textarea::make('cloudflare_tunnel_token')
+                            ->label('Tunnel Token')
+                            ->placeholder('eyJhIjoiXXXXX...')
+                            ->rows(4)
+                            ->required()
+                            ->helperText('Cloudflare Dashboard > Zero Trust > Networks > Tunnels bölümünden token alabilirsiniz.')
+                            ->default(fn ($record) => $record->cloudflare_tunnel_token),
+                    ])
+                    ->action(function ($record, array $data) {
+                        $cloudflareService = app(CloudflareService::class);
 
+                        try {
+                            // Token'ı kaydet
+                            $record->update([
+                                'cloudflare_tunnel_token' => $data['cloudflare_tunnel_token'],
+                                'cloudflare_tunnel_enabled' => true,
+                            ]);
+
+                            // Tunnel'ı başlat
+                            $result = $cloudflareService->runTunnelWithToken($record);
+
+                            if ($result['success']) {
+                                Notification::make()
+                                    ->title('Tunnel Aktifleştirildi')
+                                    ->success()
+                                    ->body("'{$record->name}' için Cloudflare Tunnel başarıyla başlatıldı.")
+                                    ->send();
+                            } else {
+                                throw new \Exception($result['error'] ?? 'Tunnel başlatılamadı');
+                            }
+                        } catch (\Exception $e) {
+                            Notification::make()
+                                ->title('Tunnel Hatası')
+                                ->danger()
+                                ->body($e->getMessage())
+                                ->send();
+                        }
+                    }),
+
+                Action::make('stopCloudflareTunnel')
+                    ->label('Tunnel Durdur')
+                    ->icon('heroicon-o-stop-circle')
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->modalHeading('Cloudflare Tunnel Durdurulsun mu?')
+                    ->modalDescription(fn ($record) => "'{$record->name}' için Cloudflare Tunnel durdurulacak.")
+                    ->modalSubmitActionLabel('Durdur')
+                    ->action(function ($record) {
+                        $cloudflareService = app(CloudflareService::class);
+
+                        try {
+                            $result = $cloudflareService->stopTunnel($record);
+
+                            if ($result['success']) {
+                                $record->update(['cloudflare_tunnel_enabled' => false]);
+
+                                Notification::make()
+                                    ->title('Tunnel Durduruldu')
+                                    ->success()
+                                    ->body("'{$record->name}' için Cloudflare Tunnel durduruldu.")
+                                    ->send();
+                            } else {
+                                throw new \Exception($result['error'] ?? 'Tunnel durdurulamadı');
+                            }
+                        } catch (\Exception $e) {
+                            Notification::make()
+                                ->title('Tunnel Hatası')
+                                ->danger()
+                                ->body($e->getMessage())
+                                ->send();
+                        }
+                    })
+                    ->visible(fn ($record) => $record->cloudflare_tunnel_enabled),
 
                 Action::make('configureNginx')
                     ->label('Nginx Yapılandır')
