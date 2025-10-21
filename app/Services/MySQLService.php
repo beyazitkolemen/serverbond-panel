@@ -45,7 +45,8 @@ class MySQLService
     public function createUser(string $username, string $password): bool
     {
         try {
-            $identifier = $this->formatUserIdentifier($username);
+            // % wildcard kullan - tüm host'lardan erişim için
+            $identifier = $this->formatUserIdentifier($username, '%');
 
             $result = $this->connection()->statement(
                 "CREATE USER IF NOT EXISTS {$identifier} IDENTIFIED BY ?",
@@ -62,7 +63,9 @@ class MySQLService
         } catch (Throwable $e) {
             \Log::error('MySQLService: createUser failed', [
                 'user' => $username,
+                'identifier' => $identifier ?? 'N/A',
                 'error' => $e->getMessage(),
+                'code' => $e->getCode(),
             ]);
             return false;
         }
@@ -72,7 +75,8 @@ class MySQLService
     {
         try {
             $database = $this->quoteIdentifier($this->normalizeIdentifier($databaseName));
-            $user = $this->formatUserIdentifier($username);
+            // % wildcard kullan - tüm host'lardan erişim için
+            $user = $this->formatUserIdentifier($username, '%');
 
             $granted = $this->connection()->statement(
                 "GRANT ALL PRIVILEGES ON {$database}.* TO {$user}"
@@ -82,6 +86,7 @@ class MySQLService
                 \Log::error('MySQLService: GRANT statement failed', [
                     'database' => $databaseName,
                     'user' => $username,
+                    'user_identifier' => $user,
                 ]);
                 return false;
             }
@@ -101,6 +106,7 @@ class MySQLService
                 'database' => $databaseName,
                 'user' => $username,
                 'error' => $e->getMessage(),
+                'code' => $e->getCode(),
             ]);
             return false;
         }
@@ -221,11 +227,12 @@ class MySQLService
     public function deleteUser(string $username): bool
     {
         try {
-            $identifier = $this->formatUserIdentifier($username);
+            // % wildcard kullan
+            $identifier = $this->formatUserIdentifier($username, '%');
 
             $dropped = $this->connection()->statement("DROP USER IF EXISTS {$identifier}");
 
-            if (! $dropped) {
+            if (!$dropped) {
                 return false;
             }
 
