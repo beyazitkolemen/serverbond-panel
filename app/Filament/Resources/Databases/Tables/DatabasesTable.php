@@ -40,10 +40,10 @@ class DatabasesTable
 
                 TextColumn::make('password')
                     ->label('Şifre')
-                    ->placeholder('•••••••••')
                     ->copyable()
                     ->copyMessage('Şifre kopyalandı!')
                     ->icon('heroicon-o-key')
+                    ->limit(20)
                     ->toggleable(),
 
                 TextColumn::make('site.name')
