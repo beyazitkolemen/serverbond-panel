@@ -243,6 +243,47 @@ class SiteForm
                                     ]),
                             ]),
 
+                        Tabs\Tab::make('Environment (.env)')
+                            ->icon('heroicon-o-cog-6-tooth')
+                            ->schema([
+                                Section::make()
+                                    ->description('Site\'nin .env dosyasını buradan düzenleyebilirsiniz. Deploy sonrası geçerli olur.')
+                                    ->schema([
+                                        CodeEditor::make('env_content')
+                                            ->label('.env Dosyası')
+                                            ->lineNumbers()
+                                            ->minHeight(500)
+                                            ->helperText('Site deploy edildikten sonra .env dosyası otomatik oluşturulur veya güncellenir.')
+                                            ->placeholder('APP_NAME=Laravel
+APP_ENV=production
+APP_KEY=
+APP_DEBUG=false
+APP_URL=https://yourdomain.com
+
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=your_database
+DB_USERNAME=your_username
+DB_PASSWORD=your_password')
+                                            ->dehydrateStateUsing(fn($state) => $state)
+                                            ->afterStateHydrated(function ($component, $state, $record) {
+                                                if ($record && $record->exists) {
+                                                    // Site'nin .env dosyasını oku
+                                                    $envContent = $record->getEnvFile();
+
+                                                    if ($envContent) {
+                                                        $component->state($envContent);
+                                                    } else {
+                                                        // Yoksa template oluştur
+                                                        $component->state($record->getDefaultEnvContent());
+                                                    }
+                                                }
+                                            })
+                                            ->columnSpanFull(),
+                                    ]),
+                            ]),
+
                         Tabs\Tab::make('Notlar')
                             ->icon('heroicon-o-document-text')
                             ->schema([

@@ -100,7 +100,55 @@ class DeploymentService
             ]);
         }
 
-        // 2. Run custom deployment script
+        // 2. .env dosyası oluştur/güncelle
+        $output[] = "Creating/updating .env file...";
+
+        // Öncelik sırası:
+        // 1. Proje içindeki .env.example
+        // 2. Panelden kaydedilmiş .env
+        // 3. Site tipine göre default template
+
+        $envExamplePath = $rootPath . '/.env.example';
+        $envPath = $rootPath . '/.env';
+
+        if (File::exists($envExamplePath) && !File::exists($envPath)) {
+            // .env.example varsa ve .env yoksa, kopyala
+            File::copy($envExamplePath, $envPath);
+            $output[] = "Copied .env.example to .env";
+
+            // Panelden kaydedilmiş değerler varsa, üzerine yaz
+            $savedEnvContent = $site->getEnvFile();
+            if ($savedEnvContent) {
+                File::put($envPath, $savedEnvContent);
+                $output[] = "Updated .env with saved configuration from panel";
+            }
+        } elseif (!File::exists($envPath)) {
+            // .env yoksa ve .env.example da yoksa
+            $envContent = $site->getEnvFile();
+
+            if (!$envContent) {
+                // Panelde de yoksa default template oluştur
+                $envContent = $site->getDefaultEnvContent();
+                $output[] = "Created .env from default template";
+            } else {
+                $output[] = "Created .env from panel configuration";
+            }
+
+            if ($envContent) {
+                File::put($envPath, $envContent);
+            }
+        } else {
+            // .env zaten varsa, panelden kaydedilmiş varsa güncelle
+            $savedEnvContent = $site->getEnvFile();
+            if ($savedEnvContent) {
+                File::put($envPath, $savedEnvContent);
+                $output[] = "Updated existing .env from panel configuration";
+            } else {
+                $output[] = "Using existing .env file";
+            }
+        }
+
+        // 3. Run custom deployment script
         if ($site->deployment_script) {
             $output[] = "Running deployment script...";
             $this->runDeploymentScript($site, $rootPath, $output);

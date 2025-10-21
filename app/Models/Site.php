@@ -89,6 +89,13 @@ class Site extends Model
                 $site->deployment_script = static::getDefaultDeploymentScript($site->type);
             }
         });
+
+        static::saved(function (Site $site) {
+            // .env dosyası içeriği varsa kaydet
+            if (request()->has('env_content') && !empty(request('env_content'))) {
+                $site->saveEnvFile(request('env_content'));
+            }
+        });
     }
 
     public static function getDefaultDeploymentScript(SiteType $type): string
@@ -228,5 +235,138 @@ sudo systemctl restart gunicorn || echo "Gunicorn yeniden başlatılamadı"
 echo "✅ Python Deployment Tamamlandı!"
 BASH,
         };
+    }
+
+    /**
+     * .env dosyasını siteye kaydet
+     */
+    public function saveEnvFile(string $content): bool
+    {
+        $sitePath = rtrim($this->root_directory, '/') . '/' . $this->domain;
+        $envPath = $sitePath . '/.env';
+
+        // Site dizini yoksa oluştur
+        if (!file_exists($sitePath)) {
+            mkdir($sitePath, 0755, true);
+        }
+
+        // .env dosyasını kaydet
+        return file_put_contents($envPath, $content) !== false;
+    }
+
+    /**
+     * .env dosyasını oku
+     */
+    public function getEnvFile(): ?string
+    {
+        $envPath = rtrim($this->root_directory, '/') . '/' . $this->domain . '/.env';
+
+        if (file_exists($envPath)) {
+            return file_get_contents($envPath);
+        }
+
+        return null;
+    }
+
+    /**
+     * .env dosyasının template'ini döndür
+     */
+    public function getDefaultEnvContent(): string
+    {
+        return match ($this->type) {
+            SiteType::Laravel => $this->getLaravelEnvTemplate(),
+            SiteType::PHP => $this->getPhpEnvTemplate(),
+            SiteType::NodeJS => $this->getNodeEnvTemplate(),
+            SiteType::Python => $this->getPythonEnvTemplate(),
+            default => '',
+        };
+    }
+
+    protected function getLaravelEnvTemplate(): string
+    {
+        return <<<ENV
+APP_NAME={$this->name}
+APP_ENV=production
+APP_KEY=
+APP_DEBUG=false
+APP_URL=https://{$this->domain}
+
+LOG_CHANNEL=stack
+LOG_LEVEL=error
+
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE={$this->database_name}
+DB_USERNAME={$this->database_user}
+DB_PASSWORD={$this->database_password}
+
+BROADCAST_DRIVER=log
+CACHE_DRIVER=redis
+FILESYSTEM_DISK=local
+QUEUE_CONNECTION=redis
+SESSION_DRIVER=redis
+SESSION_LIFETIME=120
+
+REDIS_HOST=127.0.0.1
+REDIS_PASSWORD=null
+REDIS_PORT=6379
+
+MAIL_MAILER=smtp
+MAIL_HOST=mailhog
+MAIL_PORT=1025
+MAIL_USERNAME=null
+MAIL_PASSWORD=null
+MAIL_ENCRYPTION=null
+MAIL_FROM_ADDRESS="noreply@{$this->domain}"
+MAIL_FROM_NAME="{$this->name}"
+ENV;
+    }
+
+    protected function getPhpEnvTemplate(): string
+    {
+        return <<<ENV
+APP_NAME={$this->name}
+APP_ENV=production
+APP_DEBUG=false
+APP_URL=https://{$this->domain}
+
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE={$this->database_name}
+DB_USERNAME={$this->database_user}
+DB_PASSWORD={$this->database_password}
+ENV;
+    }
+
+    protected function getNodeEnvTemplate(): string
+    {
+        return <<<ENV
+NODE_ENV=production
+APP_NAME={$this->name}
+APP_URL=https://{$this->domain}
+PORT=3000
+
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE={$this->database_name}
+DB_USERNAME={$this->database_user}
+DB_PASSWORD={$this->database_password}
+ENV;
+    }
+
+    protected function getPythonEnvTemplate(): string
+    {
+        return <<<ENV
+DEBUG=False
+SECRET_KEY=
+ALLOWED_HOSTS={$this->domain},www.{$this->domain}
+
+DATABASE_NAME={$this->database_name}
+DATABASE_USER={$this->database_user}
+DATABASE_PASSWORD={$this->database_password}
+DATABASE_HOST=127.0.0.1
+DATABASE_PORT=3306
+ENV;
     }
 }
