@@ -51,16 +51,7 @@ if [ $COMPOSER_EXIT -ne 0 ]; then
 fi
 echo "✓ Composer completed"
 
-# Cache temizleme (hata olsa bile devam et)
-echo ""
-echo "🗑️ Clearing caches..."
-php artisan config:clear 2>&1 || echo "⚠ Config clear skipped"
-php artisan cache:clear 2>&1 || echo "⚠ Cache clear skipped"
-php artisan route:clear 2>&1 || echo "⚠ Route clear skipped"
-php artisan view:clear 2>&1 || echo "⚠ View clear skipped"
-echo "✓ Cache clearing completed"
-
-# Database migrations (kritik)
+# Database migrations 
 echo ""
 echo "🗄️ Running migrations..."
 php artisan migrate --force
@@ -70,6 +61,15 @@ if [ $MIGRATE_EXIT -ne 0 ]; then
     exit $MIGRATE_EXIT
 fi
 echo "✓ Migrations completed"
+
+# Cache temizleme (hata olsa bile devam et)
+echo ""
+echo "🗑️ Clearing caches..."
+php artisan config:clear 2>&1 || echo "⚠ Config clear skipped"
+php artisan cache:clear 2>&1 || echo "⚠ Cache clear skipped"
+php artisan route:clear 2>&1 || echo "⚠ Route clear skipped"
+php artisan view:clear 2>&1 || echo "⚠ View clear skipped"
+echo "✓ Cache clearing completed"
 
 # Optimize (hata olsa bile devam et)
 echo ""
