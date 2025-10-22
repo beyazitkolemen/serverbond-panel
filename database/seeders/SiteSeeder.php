@@ -16,14 +16,14 @@ class SiteSeeder extends Seeder
 
         Site::truncate();
 
-        $site = Site::create([
+            $site = Site::create([
             'name' => 'Laravel Blog',
-            'domain' => 'blog.example.com',
+            'domain' => 'blog.artf4.com',
             'type' => SiteType::Laravel->value,
             'php_version' => PHPVersion::PHP84->value,
             'root_directory' => '/var/www/blog.example.com',
         ]);
-        $find = Site::where('domain', 'blog.example.com')->first();
+        $find = Site::where('domain', 'blog.artf4.com')->first();
 
         $appService = new AppService();
         $appService->createApp($find);
