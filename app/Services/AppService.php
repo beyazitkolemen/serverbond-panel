@@ -30,7 +30,7 @@ class AppService
 
         // Create Nginx Site
         $addSiteService = new AddSiteService();
-        $addSiteService->execute($site->domain, $site->root_directory);
+        $addSiteService->execute($site->domain, $site->root_directory, 'laravel');
 
         $databaseCredentials = $this->generateDatabaseCredentials($site);
         // Create Database
