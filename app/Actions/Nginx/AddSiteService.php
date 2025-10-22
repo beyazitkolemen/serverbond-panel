@@ -39,6 +39,6 @@ class AddSiteService extends BaseServerBondService
             $params['server_alias'] = $serverAlias;
         }
 
-        return $this->executeScript($this->getScriptPath(category: 'nginx', 'add_site'), $params);
+        return $this->executeScript($this->getScriptPath('nginx', 'add_site'), $params);
     }
 }
