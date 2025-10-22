@@ -16,8 +16,9 @@ class SiteSeeder extends Seeder
             [
                 'name' => 'Laravel Blog',
                 'domain' => 'blog.example.com',
-                'type' => SiteType::Laravel,
-                'php_version' => PHPVersion::PHP84,
+                'type' => SiteType::Laravel->value,
+                'php_version' => PHPVersion::PHP84->value,
+                'root_directory' => '/var/www/deneme',
             ],
         ];
 
@@ -27,6 +28,7 @@ class SiteSeeder extends Seeder
                 'domain' => $site['domain'],
                 'type' => $site['type'],
                 'php_version' => $site['php_version'],
+                'root_directory' => '/var/www/deneme',
             ]);
             $appService = new AppService();
             $appService->createApp($site);
