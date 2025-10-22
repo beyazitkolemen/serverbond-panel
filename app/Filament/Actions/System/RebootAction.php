@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Filament\Actions\System;
 
+use App\Actions\System\RebootService;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
-use Illuminate\Support\Facades\Process;
+use Throwable;
 
 class RebootAction extends Action
 {
@@ -27,28 +28,44 @@ class RebootAction extends Action
             ->modalDescription('Sunucuyu yeniden başlatacak. Bu işlem tüm servisleri durduracak ve sistem kapanacak.')
             ->modalSubmitActionLabel('Yeniden Başlat')
             ->action(function (): void {
-                $this->executeScript();
+                $this->executeAction();
             });
     }
 
-    private function executeScript(): void
+    private function executeAction(): void
     {
         try {
-            $scriptPath = config('serverbond-action.base_dir') . '/system/reboot.sh';
-            
-            $result = Process::timeout(30) // Kısa timeout çünkü sistem kapanacak
-                ->run("bash {$scriptPath}");
+            $result = app(RebootService::class)->execute();
 
-            if ($result->successful()) {
+            $status = $result['status'] ?? null;
+            $message = $result['message'] ?? null;
+
+            if ($status === 'success') {
                 Notification::make()
                     ->title('Sistem Yeniden Başlatılıyor')
-                    ->body('Sunucu yeniden başlatma komutu gönderildi')
+                    ->body($message ?? 'Sunucu yeniden başlatma komutu gönderildi')
                     ->warning()
                     ->send();
-            } else {
-                throw new \Exception($result->errorOutput());
+
+                return;
             }
-        } catch (\Exception $e) {
+
+            if ($status === 'warning') {
+                Notification::make()
+                    ->title('Yeniden Başlatma Uyarısı')
+                    ->body($message ?? 'Yeniden başlatma işlemi ile ilgili uyarılar oluştu')
+                    ->warning()
+                    ->send();
+
+                return;
+            }
+
+            Notification::make()
+                ->title('Yeniden Başlatma Hatası')
+                ->body($message ?? 'Yeniden başlatma sırasında hata oluştu')
+                ->danger()
+                ->send();
+        } catch (Throwable $e) {
             Notification::make()
                 ->title('Yeniden Başlatma Hatası')
                 ->body('Yeniden başlatma sırasında hata oluştu: ' . $e->getMessage())

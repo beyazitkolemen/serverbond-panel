@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace App\Filament\Actions\Nginx;
 
+use App\Actions\Nginx\RemoveSiteService;
 use Filament\Actions\Action;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
-use Illuminate\Support\Facades\Process;
+use Throwable;
 
 class RemoveSiteAction extends Action
 {
@@ -34,31 +35,44 @@ class RemoveSiteAction extends Action
                     ->helperText('Kaldırılacak site domain adresi'),
             ])
             ->action(function (array $data): void {
-                $this->executeScript($data);
+                $this->executeAction($data);
             });
     }
 
-    private function executeScript(array $data): void
+    private function executeAction(array $data): void
     {
         try {
-            $scriptPath = config('serverbond-action.base_dir') . '/nginx/remove_site.sh';
-            
-            $result = Process::timeout(config('serverbond-action.execution.timeout', 300))
-                ->run("bash {$scriptPath} --domain={$data['domain']}");
+            $result = app(RemoveSiteService::class)->execute($data['domain']);
 
-            if ($result->successful()) {
-                $output = $result->output();
-                $response = json_decode($output, true);
+            $status = $result['status'] ?? null;
+            $message = $result['message'] ?? null;
 
+            if ($status === 'success') {
                 Notification::make()
                     ->title('Site Kaldırıldı')
-                    ->body($response['message'] ?? "Site {$data['domain']} başarıyla kaldırıldı")
+                    ->body($message ?? "Site {$data['domain']} başarıyla kaldırıldı")
                     ->success()
                     ->send();
-            } else {
-                throw new \Exception($result->errorOutput());
+
+                return;
             }
-        } catch (\Exception $e) {
+
+            if ($status === 'warning') {
+                Notification::make()
+                    ->title('Site Kaldırma Uyarısı')
+                    ->body($message ?? 'Site kaldırılırken uyarılar oluştu')
+                    ->warning()
+                    ->send();
+
+                return;
+            }
+
+            Notification::make()
+                ->title('Site Kaldırma Hatası')
+                ->body($message ?? 'Site kaldırılırken hata oluştu')
+                ->danger()
+                ->send();
+        } catch (Throwable $e) {
             Notification::make()
                 ->title('Site Kaldırma Hatası')
                 ->body('Site kaldırılırken hata oluştu: ' . $e->getMessage())

@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Filament\Actions\System;
 
+use App\Actions\System\Fail2banInstallService;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
-use Illuminate\Support\Facades\Process;
+use Throwable;
 
 class Fail2banInstallAction extends Action
 {
@@ -27,31 +28,44 @@ class Fail2banInstallAction extends Action
             ->modalDescription('Fail2ban kurulacak ve SSH/Nginx jail\'leri etkinleştirilecek.')
             ->modalSubmitActionLabel('Kur ve Etkinleştir')
             ->action(function (): void {
-                $this->executeScript();
+                $this->executeAction();
             });
     }
 
-    private function executeScript(): void
+    private function executeAction(): void
     {
         try {
-            $scriptPath = config('serverbond-action.base_dir') . '/system/fail2ban_install.sh';
-            
-            $result = Process::timeout(config('serverbond-action.execution.timeout', 300))
-                ->run("bash {$scriptPath}");
+            $result = app(Fail2banInstallService::class)->execute();
 
-            if ($result->successful()) {
-                $output = $result->output();
-                $data = json_decode($output, true);
+            $status = $result['status'] ?? null;
+            $message = $result['message'] ?? null;
 
+            if ($status === 'success') {
                 Notification::make()
                     ->title('Fail2ban Kurulumu Başarılı')
-                    ->body($data['message'] ?? 'Fail2ban başarıyla kuruldu ve yapılandırıldı')
+                    ->body($message ?? 'Fail2ban başarıyla kuruldu ve yapılandırıldı')
                     ->success()
                     ->send();
-            } else {
-                throw new \Exception($result->errorOutput());
+
+                return;
             }
-        } catch (\Exception $e) {
+
+            if ($status === 'warning') {
+                Notification::make()
+                    ->title('Fail2ban Kurulumu')
+                    ->body($message ?? 'Fail2ban kurulumu sırasında uyarılar oluştu')
+                    ->warning()
+                    ->send();
+
+                return;
+            }
+
+            Notification::make()
+                ->title('Fail2ban Kurulum Hatası')
+                ->body($message ?? 'Fail2ban kurulumu sırasında hata oluştu')
+                ->danger()
+                ->send();
+        } catch (Throwable $e) {
             Notification::make()
                 ->title('Fail2ban Kurulum Hatası')
                 ->body('Fail2ban kurulumu sırasında hata oluştu: ' . $e->getMessage())

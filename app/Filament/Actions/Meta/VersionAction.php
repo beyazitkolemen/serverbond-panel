@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Filament\Actions\Meta;
 
+use App\Actions\Meta\VersionService;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
-use Illuminate\Support\Facades\Process;
+use Throwable;
 
 class VersionAction extends Action
 {
@@ -23,42 +24,51 @@ class VersionAction extends Action
             ->icon('heroicon-o-information-circle')
             ->color('info')
             ->action(function (): void {
-                $this->executeScript();
+                $this->executeAction();
             });
     }
 
-    private function executeScript(): void
+    private function executeAction(): void
     {
         try {
-            $scriptPath = config('serverbond-action.base_dir') . '/meta/version.sh';
-            
-            $result = Process::timeout(config('serverbond-action.execution.timeout', 300))
-                ->run("bash {$scriptPath}");
+            $result = app(VersionService::class)->execute();
 
-            if ($result->successful()) {
-                $output = $result->output();
-                $data = json_decode($output, true);
+            $status = $result['status'] ?? null;
+            $message = $result['message'] ?? null;
+            $data = $result['data'] ?? null;
 
-                if ($data && isset($data['data'])) {
-                    $version = $data['data'];
-                    $message = "Sürüm: {$version['version']} | Build: {$version['build']} | Tarih: {$version['date']}";
-                    
-                    Notification::make()
-                        ->title('Agent Sürüm Bilgisi')
-                        ->body($message)
-                        ->info()
-                        ->send();
-                } else {
-                    Notification::make()
-                        ->title('Agent Sürüm Bilgisi')
-                        ->body($data['message'] ?? 'Sürüm bilgisi alındı')
-                        ->info()
-                        ->send();
+            if ($status === 'success') {
+                if (is_array($data)) {
+                    $message = 'Sürüm: ' . ($data['version'] ?? 'Bilinmiyor')
+                        . ' | Build: ' . ($data['build'] ?? 'Bilinmiyor')
+                        . ' | Tarih: ' . ($data['date'] ?? 'Bilinmiyor');
                 }
-            } else {
-                throw new \Exception($result->errorOutput());
+
+                Notification::make()
+                    ->title('Agent Sürüm Bilgisi')
+                    ->body($message ?? 'Sürüm bilgisi alındı')
+                    ->info()
+                    ->send();
+
+                return;
             }
-        } catch (\Exception $e) {
+
+            if ($status === 'warning') {
+                Notification::make()
+                    ->title('Agent Sürüm Bilgisi')
+                    ->body($message ?? 'Sürüm bilgisi alınırken uyarılar oluştu')
+                    ->warning()
+                    ->send();
+
+                return;
+            }
+
+            Notification::make()
+                ->title('Sürüm Bilgisi Hatası')
+                ->body($message ?? 'Sürüm bilgisi alınamadı')
+                ->danger()
+                ->send();
+        } catch (Throwable $e) {
             Notification::make()
                 ->title('Sürüm Bilgisi Hatası')
                 ->body('Sürüm bilgisi alınırken hata oluştu: ' . $e->getMessage())

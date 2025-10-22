@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace App\Filament\Actions\System;
 
+use App\Actions\System\HostnameService;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
-use Illuminate\Support\Facades\Process;
+use Throwable;
 
 class HostnameAction extends Action
 {
@@ -41,36 +42,55 @@ class HostnameAction extends Action
                     ->helperText('Sadece küçük harf, rakam ve tire kullanın'),
             ])
             ->action(function (array $data): void {
-                $this->executeScript($data);
+                $this->executeAction($data);
             });
     }
 
-    private function executeScript(array $data): void
+    private function executeAction(array $data): void
     {
         try {
-            $scriptPath = config('serverbond-action.base_dir') . '/system/hostname.sh';
-            
-            $command = "bash {$scriptPath} --action={$data['action']}";
-            if ($data['action'] === 'set' && !empty($data['hostname'])) {
-                $command .= " --hostname={$data['hostname']}";
-            }
-            
-            $result = Process::timeout(config('serverbond-action.execution.timeout', 300))
-                ->run($command);
+            /** @var HostnameService $service */
+            $service = app(HostnameService::class);
+            $mode = $data['action'] ?? 'view';
 
-            if ($result->successful()) {
-                $output = $result->output();
-                $response = json_decode($output, true);
+            $result = $mode === 'set'
+                ? $service->set($data['hostname'])
+                : $service->view();
+
+            $status = $result['status'] ?? null;
+            $message = $result['message'] ?? null;
+            $payload = $result['data'] ?? null;
+
+            if ($status === 'success') {
+                if ($mode === 'view' && is_array($payload) && isset($payload['hostname'])) {
+                    $message = 'Mevcut hostname: ' . $payload['hostname'];
+                }
 
                 Notification::make()
                     ->title('Hostname İşlemi Başarılı')
-                    ->body($response['message'] ?? 'Hostname işlemi tamamlandı')
+                    ->body($message ?? 'Hostname işlemi tamamlandı')
                     ->success()
                     ->send();
-            } else {
-                throw new \Exception($result->errorOutput());
+
+                return;
             }
-        } catch (\Exception $e) {
+
+            if ($status === 'warning') {
+                Notification::make()
+                    ->title('Hostname İşlemi')
+                    ->body($message ?? 'Hostname işlemi sırasında uyarılar oluştu')
+                    ->warning()
+                    ->send();
+
+                return;
+            }
+
+            Notification::make()
+                ->title('Hostname Hatası')
+                ->body($message ?? 'Hostname işlemi sırasında hata oluştu')
+                ->danger()
+                ->send();
+        } catch (Throwable $e) {
             Notification::make()
                 ->title('Hostname Hatası')
                 ->body('Hostname işlemi sırasında hata oluştu: ' . $e->getMessage())

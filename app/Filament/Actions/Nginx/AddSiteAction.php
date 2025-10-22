@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace App\Filament\Actions\Nginx;
 
+use App\Actions\Nginx\AddSiteService;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
-use Illuminate\Support\Facades\Process;
+use Throwable;
 
 class AddSiteAction extends Action
 {
@@ -62,45 +63,56 @@ class AddSiteAction extends Action
                     ->helperText('Alternatif domain adları (virgülle ayırın)'),
             ])
             ->action(function (array $data): void {
-                $this->executeScript($data);
+                $this->executeAction($data);
             });
     }
 
-    private function executeScript(array $data): void
+    private function executeAction(array $data): void
     {
         try {
-            $scriptPath = config('serverbond-action.base_dir') . '/nginx/add_site.sh';
-            
-            $command = "bash {$scriptPath} --domain={$data['domain']} --type={$data['type']} --root={$data['root']}";
-            
-            if (!empty($data['php_version'])) {
-                $command .= " --php_version={$data['php_version']}";
-            }
-            
-            if (!empty($data['upstream_port'])) {
-                $command .= " --upstream_port={$data['upstream_port']}";
-            }
-            
-            if (!empty($data['server_alias'])) {
-                $command .= " --server_alias={$data['server_alias']}";
-            }
-            
-            $result = Process::timeout(config('serverbond-action.execution.timeout', 300))
-                ->run($command);
+            $service = app(AddSiteService::class);
+            $phpVersion = $data['php_version'] ?? null;
+            $upstreamPort = $data['upstream_port'] ?? null;
+            $serverAlias = $data['server_alias'] ?? null;
 
-            if ($result->successful()) {
-                $output = $result->output();
-                $response = json_decode($output, true);
+            $result = $service->execute(
+                domain: $data['domain'],
+                type: $data['type'],
+                root: $data['root'],
+                phpVersion: $phpVersion !== null && $phpVersion !== '' ? $phpVersion : null,
+                upstreamPort: $upstreamPort !== null && $upstreamPort !== '' ? (int) $upstreamPort : null,
+                serverAlias: $serverAlias !== null && $serverAlias !== '' ? $serverAlias : null,
+            );
 
+            $status = $result['status'] ?? null;
+            $message = $result['message'] ?? null;
+
+            if ($status === 'success') {
                 Notification::make()
                     ->title('Site Eklendi')
-                    ->body($response['message'] ?? "Site {$data['domain']} başarıyla eklendi")
+                    ->body($message ?? "Site {$data['domain']} başarıyla eklendi")
                     ->success()
                     ->send();
-            } else {
-                throw new \Exception($result->errorOutput());
+
+                return;
             }
-        } catch (\Exception $e) {
+
+            if ($status === 'warning') {
+                Notification::make()
+                    ->title('Site Ekleme Uyarısı')
+                    ->body($message ?? 'Site eklenirken uyarılar oluştu')
+                    ->warning()
+                    ->send();
+
+                return;
+            }
+
+            Notification::make()
+                ->title('Site Ekleme Hatası')
+                ->body($message ?? 'Site eklenirken hata oluştu')
+                ->danger()
+                ->send();
+        } catch (Throwable $e) {
             Notification::make()
                 ->title('Site Ekleme Hatası')
                 ->body('Site eklenirken hata oluştu: ' . $e->getMessage())

@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Filament\Actions\Meta;
 
+use App\Actions\Meta\DiagnosticsService;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
-use Illuminate\Support\Facades\Process;
+use Throwable;
 
 class DiagnosticsAction extends Action
 {
@@ -23,45 +24,52 @@ class DiagnosticsAction extends Action
             ->icon('heroicon-o-wrench-screwdriver')
             ->color('warning')
             ->action(function (): void {
-                $this->executeScript();
+                $this->executeAction();
             });
     }
 
-    private function executeScript(): void
+    private function executeAction(): void
     {
         try {
-            $scriptPath = config('serverbond-action.base_dir') . '/meta/diagnostics.sh';
-            
-            $result = Process::timeout(config('serverbond-action.execution.timeout', 300))
-                ->run("bash {$scriptPath}");
+            $result = app(DiagnosticsService::class)->execute();
 
-            if ($result->successful()) {
-                $output = $result->output();
-                $data = json_decode($output, true);
+            $status = $result['status'] ?? null;
+            $message = $result['message'] ?? null;
+            $data = $result['data'] ?? null;
 
-                if ($data && isset($data['data'])) {
-                    $diagnostics = $data['data'];
-                    $message = "Nginx: " . ($diagnostics['nginx'] ?? 'Bilinmiyor') . 
-                              " | PHP: " . ($diagnostics['php'] ?? 'Bilinmiyor') . 
-                              " | MySQL: " . ($diagnostics['mysql'] ?? 'Bilinmiyor') . 
-                              " | Redis: " . ($diagnostics['redis'] ?? 'Bilinmiyor');
-                    
-                    Notification::make()
-                        ->title('Sistem Tanılaması')
-                        ->body($message)
-                        ->success()
-                        ->send();
-                } else {
-                    Notification::make()
-                        ->title('Sistem Tanılaması')
-                        ->body($data['message'] ?? 'Tanılama tamamlandı')
-                        ->info()
-                        ->send();
+            if ($status === 'success') {
+                if (is_array($data)) {
+                    $message = 'Nginx: ' . ($data['nginx'] ?? 'Bilinmiyor')
+                        . ' | PHP: ' . ($data['php'] ?? 'Bilinmiyor')
+                        . ' | MySQL: ' . ($data['mysql'] ?? 'Bilinmiyor')
+                        . ' | Redis: ' . ($data['redis'] ?? 'Bilinmiyor');
                 }
-            } else {
-                throw new \Exception($result->errorOutput());
+
+                Notification::make()
+                    ->title('Sistem Tanılaması')
+                    ->body($message ?? 'Tanılama tamamlandı')
+                    ->success()
+                    ->send();
+
+                return;
             }
-        } catch (\Exception $e) {
+
+            if ($status === 'warning') {
+                Notification::make()
+                    ->title('Sistem Tanılaması')
+                    ->body($message ?? 'Tanılama tamamlandı ancak uyarılar mevcut')
+                    ->warning()
+                    ->send();
+
+                return;
+            }
+
+            Notification::make()
+                ->title('Tanılama Hatası')
+                ->body($message ?? 'Tanılama sırasında hata oluştu')
+                ->danger()
+                ->send();
+        } catch (Throwable $e) {
             Notification::make()
                 ->title('Tanılama Hatası')
                 ->body('Tanılama sırasında hata oluştu: ' . $e->getMessage())
