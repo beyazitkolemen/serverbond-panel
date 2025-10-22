@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Enums\SiteStatus;
 use App\Enums\SiteType;
-use App\Services\DeploymentScriptService;
+use App\Enums\PHPVersion;
+use App\Enums\SiteStatus;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOne;
+use App\Services\DeploymentScriptService;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Site extends Model
 {
@@ -48,6 +49,7 @@ class Site extends Model
         'auto_deploy' => 'boolean',
         'cloudflare_tunnel_enabled' => 'boolean',
         'last_deployed_at' => 'datetime',
+        'php_version' => PHPVersion::class,
     ];
 
 

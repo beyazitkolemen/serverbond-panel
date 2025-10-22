@@ -13,9 +13,9 @@ class AdminUserSeeder extends Seeder
     public function run(): void
     {
         User::create([
-            'name' => 'Admin',
-            'email' => 'admin@serverbond.local',
-            'password' => Hash::make('password'),
+            'name' => 'Beyazıt Kölemen',
+            'email' => 'beyazit@artf4.com',
+            'password' => Hash::make('121234'),
             'email_verified_at' => now(),
         ]);
     }
