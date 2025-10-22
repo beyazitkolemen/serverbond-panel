@@ -23,6 +23,11 @@ class AppService
      */
     public function createApp(Site $site): void
     {
+        // Validate required fields
+        if (empty($site->root_directory)) {
+            throw new \InvalidArgumentException('Site root_directory is required but was null or empty');
+        }
+
         // Create Nginx Site
         $addSiteService = new AddSiteService();
         $addSiteService->execute($site->domain, $site->type->value, $site->root_directory, $site->php_version->value);

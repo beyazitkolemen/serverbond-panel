@@ -22,10 +22,10 @@ class AddSiteService extends BaseServerBondService
         $params = [
             'domain' => $domain,
             'type' => $type,
-            'root' => $root,
+            'document_root' => $root, // Script'te $DOCUMENT_ROOT olarak bekleniyor
         ];
 
-        $this->validateParams($params, ['domain', 'type', 'root']);
+        $this->validateParams($params, ['domain', 'type', 'document_root']);
 
         if ($phpVersion) {
             $params['php_version'] = $phpVersion;
