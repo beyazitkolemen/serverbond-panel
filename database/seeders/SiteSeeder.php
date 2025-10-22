@@ -15,27 +15,16 @@ class SiteSeeder extends Seeder
     {        Database::truncate();
 
         Site::truncate();
-        $sites = [
-            [
-                'name' => 'Laravel Blog',
-                'domain' => 'blog.example.com',
-                'type' => SiteType::Laravel->value,
-                'php_version' => PHPVersion::PHP84->value,
-                'root_directory' => '/var/www/deneme',
-            ],
-        ];
 
-        foreach ($sites as $site) {
-            $site = Site::create([
-                'name' => $site['name'],
-                'domain' => $site['domain'],
-                'type' => $site['type'],
-                'php_version' => $site['php_version'],
-                'root_directory' => '/var/www/deneme',
-            ]);
-            $appService = new AppService();
-            $appService->createApp($site);
-            dd($appService);
-        }
+        $site = Site::create([
+            'name' => 'Laravel Blog',
+            'domain' => 'blog.example.com',
+            'type' => SiteType::Laravel->value,
+            'php_version' => PHPVersion::PHP84->value,
+            'root_directory' => '/var/www/blog.example.com',
+        ]);
+
+        $appService = new AppService();
+        $appService->createApp($site);
     }
 }
