@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace App\Filament\Actions\System;
 
+use App\Actions\System\LogsService;
 use Filament\Actions\Action;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
-use Illuminate\Support\Facades\Process;
+use Throwable;
 
 class LogsAction extends Action
 {
@@ -33,32 +34,45 @@ class LogsAction extends Action
                     ->helperText('Gösterilecek log satır sayısı (1-10000)'),
             ])
             ->action(function (array $data): void {
-                $this->executeScript($data);
+                $this->executeAction($data);
             });
     }
 
-    private function executeScript(array $data): void
+    private function executeAction(array $data): void
     {
         try {
-            $scriptPath = config('serverbond-action.base_dir') . '/system/logs.sh';
-            $lines = $data['lines'] ?? 200;
-            
-            $result = Process::timeout(config('serverbond-action.execution.timeout', 300))
-                ->run("bash {$scriptPath} --lines={$lines}");
+            $lines = isset($data['lines']) && $data['lines'] !== '' ? (int) $data['lines'] : 200;
+            $result = app(LogsService::class)->execute($lines);
 
-            if ($result->successful()) {
-                $output = $result->output();
-                $data = json_decode($output, true);
+            $status = $result['status'] ?? null;
+            $message = $result['message'] ?? null;
 
+            if ($status === 'success') {
                 Notification::make()
                     ->title('Sistem Logları')
-                    ->body($data['message'] ?? 'Loglar başarıyla alındı')
+                    ->body($message ?? 'Loglar başarıyla alındı')
                     ->success()
                     ->send();
-            } else {
-                throw new \Exception($result->errorOutput());
+
+                return;
             }
-        } catch (\Exception $e) {
+
+            if ($status === 'warning') {
+                Notification::make()
+                    ->title('Sistem Logları')
+                    ->body($message ?? 'Loglar alınırken uyarılar oluştu')
+                    ->warning()
+                    ->send();
+
+                return;
+            }
+
+            Notification::make()
+                ->title('Log Hatası')
+                ->body($message ?? 'Loglar alınırken hata oluştu')
+                ->danger()
+                ->send();
+        } catch (Throwable $e) {
             Notification::make()
                 ->title('Log Hatası')
                 ->body('Loglar alınırken hata oluştu: ' . $e->getMessage())

@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace App\Filament\Actions\Nginx;
 
+use App\Actions\Nginx\EnableSslService;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
-use Illuminate\Support\Facades\Process;
+use Throwable;
 
 class EnableSslAction extends Action
 {
@@ -42,37 +43,48 @@ class EnableSslAction extends Action
                     ->helperText('HTTP trafiğini otomatik olarak HTTPS\'e yönlendir'),
             ])
             ->action(function (array $data): void {
-                $this->executeScript($data);
+                $this->executeAction($data);
             });
     }
 
-    private function executeScript(array $data): void
+    private function executeAction(array $data): void
     {
         try {
-            $scriptPath = config('serverbond-action.base_dir') . '/nginx/enable_ssl.sh';
-            
-            $command = "bash {$scriptPath} --domain={$data['domain']} --email={$data['email']}";
-            
-            if ($data['redirect_https']) {
-                $command .= " --redirect_https=true";
-            }
-            
-            $result = Process::timeout(config('serverbond-action.execution.timeout', 300))
-                ->run($command);
+            $result = app(EnableSslService::class)->execute(
+                domain: $data['domain'],
+                email: $data['email'],
+                redirectHttps: (bool) ($data['redirect_https'] ?? true),
+            );
 
-            if ($result->successful()) {
-                $output = $result->output();
-                $response = json_decode($output, true);
+            $status = $result['status'] ?? null;
+            $message = $result['message'] ?? null;
 
+            if ($status === 'success') {
                 Notification::make()
                     ->title('SSL Etkinleştirildi')
-                    ->body($response['message'] ?? "SSL sertifikası {$data['domain']} için başarıyla alındı")
+                    ->body($message ?? "SSL sertifikası {$data['domain']} için başarıyla alındı")
                     ->success()
                     ->send();
-            } else {
-                throw new \Exception($result->errorOutput());
+
+                return;
             }
-        } catch (\Exception $e) {
+
+            if ($status === 'warning') {
+                Notification::make()
+                    ->title('SSL Etkinleştirme Uyarısı')
+                    ->body($message ?? 'SSL etkinleştirilirken uyarılar oluştu')
+                    ->warning()
+                    ->send();
+
+                return;
+            }
+
+            Notification::make()
+                ->title('SSL Etkinleştirme Hatası')
+                ->body($message ?? 'SSL etkinleştirilirken hata oluştu')
+                ->danger()
+                ->send();
+        } catch (Throwable $e) {
             Notification::make()
                 ->title('SSL Etkinleştirme Hatası')
                 ->body('SSL etkinleştirilirken hata oluştu: ' . $e->getMessage())

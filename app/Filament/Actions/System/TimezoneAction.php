@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace App\Filament\Actions\System;
 
+use App\Actions\System\TimezoneService;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
-use Illuminate\Support\Facades\Process;
+use Throwable;
 
 class TimezoneAction extends Action
 {
@@ -41,36 +42,55 @@ class TimezoneAction extends Action
                     ->helperText('Örnek: Europe/Istanbul, America/New_York, Asia/Tokyo'),
             ])
             ->action(function (array $data): void {
-                $this->executeScript($data);
+                $this->executeAction($data);
             });
     }
 
-    private function executeScript(array $data): void
+    private function executeAction(array $data): void
     {
         try {
-            $scriptPath = config('serverbond-action.base_dir') . '/system/timezone.sh';
-            
-            $command = "bash {$scriptPath} --action={$data['action']}";
-            if ($data['action'] === 'set' && !empty($data['tz'])) {
-                $command .= " --tz={$data['tz']}";
-            }
-            
-            $result = Process::timeout(config('serverbond-action.execution.timeout', 300))
-                ->run($command);
+            /** @var TimezoneService $service */
+            $service = app(TimezoneService::class);
+            $mode = $data['action'] ?? 'view';
 
-            if ($result->successful()) {
-                $output = $result->output();
-                $response = json_decode($output, true);
+            $result = $mode === 'set'
+                ? $service->set($data['tz'])
+                : $service->view();
+
+            $status = $result['status'] ?? null;
+            $message = $result['message'] ?? null;
+            $payload = $result['data'] ?? null;
+
+            if ($status === 'success') {
+                if ($mode === 'view' && is_array($payload) && isset($payload['timezone'])) {
+                    $message = 'Mevcut saat dilimi: ' . $payload['timezone'];
+                }
 
                 Notification::make()
                     ->title('Saat Dilimi İşlemi Başarılı')
-                    ->body($response['message'] ?? 'Saat dilimi işlemi tamamlandı')
+                    ->body($message ?? 'Saat dilimi işlemi tamamlandı')
                     ->success()
                     ->send();
-            } else {
-                throw new \Exception($result->errorOutput());
+
+                return;
             }
-        } catch (\Exception $e) {
+
+            if ($status === 'warning') {
+                Notification::make()
+                    ->title('Saat Dilimi İşlemi')
+                    ->body($message ?? 'Saat dilimi işlemi sırasında uyarılar oluştu')
+                    ->warning()
+                    ->send();
+
+                return;
+            }
+
+            Notification::make()
+                ->title('Saat Dilimi Hatası')
+                ->body($message ?? 'Saat dilimi işlemi sırasında hata oluştu')
+                ->danger()
+                ->send();
+        } catch (Throwable $e) {
             Notification::make()
                 ->title('Saat Dilimi Hatası')
                 ->body('Saat dilimi işlemi sırasında hata oluştu: ' . $e->getMessage())

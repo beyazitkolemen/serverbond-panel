@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Filament\Actions\Nginx;
 
+use App\Actions\Nginx\ListSitesService;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
-use Illuminate\Support\Facades\Process;
+use Throwable;
 
 class ListSitesAction extends Action
 {
@@ -23,44 +24,54 @@ class ListSitesAction extends Action
             ->icon('heroicon-o-list-bullet')
             ->color('info')
             ->action(function (): void {
-                $this->executeScript();
+                $this->executeAction();
             });
     }
 
-    private function executeScript(): void
+    private function executeAction(): void
     {
         try {
-            $scriptPath = config('serverbond-action.base_dir') . '/nginx/list_sites.sh';
-            
-            $result = Process::timeout(config('serverbond-action.execution.timeout', 300))
-                ->run("bash {$scriptPath}");
+            $result = app(ListSitesService::class)->execute();
 
-            if ($result->successful()) {
-                $output = $result->output();
-                $data = json_decode($output, true);
+            $status = $result['status'] ?? null;
+            $message = $result['message'] ?? null;
+            $data = $result['data'] ?? null;
 
-                if ($data && isset($data['data']) && is_array($data['data'])) {
-                    $sites = $data['data'];
-                    $totalSites = count($sites);
-                    $activeSites = count(array_filter($sites, fn($site) => $site['status'] === 'active'));
+            if ($status === 'success') {
+                if (is_array($data)) {
+                    $totalSites = count($data);
+                    $activeSites = count(array_filter(
+                        $data,
+                        static fn ($site): bool => is_array($site) && (($site['status'] ?? null) === 'active')
+                    ));
                     $message = "Toplam {$totalSites} site, {$activeSites} aktif";
-                    
-                    Notification::make()
-                        ->title('Site Listesi')
-                        ->body($message)
-                        ->success()
-                        ->send();
-                } else {
-                    Notification::make()
-                        ->title('Site Listesi')
-                        ->body($data['message'] ?? 'Site listesi alındı')
-                        ->info()
-                        ->send();
                 }
-            } else {
-                throw new \Exception($result->errorOutput());
+
+                Notification::make()
+                    ->title('Site Listesi')
+                    ->body($message ?? 'Site listesi alındı')
+                    ->success()
+                    ->send();
+
+                return;
             }
-        } catch (\Exception $e) {
+
+            if ($status === 'warning') {
+                Notification::make()
+                    ->title('Site Listesi')
+                    ->body($message ?? 'Site listesi alınırken uyarılar oluştu')
+                    ->warning()
+                    ->send();
+
+                return;
+            }
+
+            Notification::make()
+                ->title('Site Listesi Hatası')
+                ->body($message ?? 'Site listesi alınamadı')
+                ->danger()
+                ->send();
+        } catch (Throwable $e) {
             Notification::make()
                 ->title('Site Listesi Hatası')
                 ->body('Site listesi alınırken hata oluştu: ' . $e->getMessage())

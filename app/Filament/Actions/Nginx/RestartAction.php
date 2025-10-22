@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Filament\Actions\Nginx;
 
+use App\Actions\Nginx\RestartService;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
-use Illuminate\Support\Facades\Process;
+use Throwable;
 
 class RestartAction extends Action
 {
@@ -27,31 +28,44 @@ class RestartAction extends Action
             ->modalDescription('Nginx servisi yeniden başlatılacak. Kısa bir süre web siteleri erişilemez olabilir.')
             ->modalSubmitActionLabel('Yeniden Başlat')
             ->action(function (): void {
-                $this->executeScript();
+                $this->executeAction();
             });
     }
 
-    private function executeScript(): void
+    private function executeAction(): void
     {
         try {
-            $scriptPath = config('serverbond-action.base_dir') . '/nginx/restart.sh';
-            
-            $result = Process::timeout(config('serverbond-action.execution.timeout', 300))
-                ->run("bash {$scriptPath}");
+            $result = app(RestartService::class)->execute();
 
-            if ($result->successful()) {
-                $output = $result->output();
-                $data = json_decode($output, true);
+            $status = $result['status'] ?? null;
+            $message = $result['message'] ?? null;
 
+            if ($status === 'success') {
                 Notification::make()
                     ->title('Nginx Yeniden Başlatıldı')
-                    ->body($data['message'] ?? 'Nginx servisi başarıyla yeniden başlatıldı')
+                    ->body($message ?? 'Nginx servisi başarıyla yeniden başlatıldı')
                     ->success()
                     ->send();
-            } else {
-                throw new \Exception($result->errorOutput());
+
+                return;
             }
-        } catch (\Exception $e) {
+
+            if ($status === 'warning') {
+                Notification::make()
+                    ->title('Nginx Yeniden Başlatma Uyarısı')
+                    ->body($message ?? 'Nginx yeniden başlatılırken uyarılar oluştu')
+                    ->warning()
+                    ->send();
+
+                return;
+            }
+
+            Notification::make()
+                ->title('Nginx Yeniden Başlatma Hatası')
+                ->body($message ?? 'Nginx yeniden başlatılırken hata oluştu')
+                ->danger()
+                ->send();
+        } catch (Throwable $e) {
             Notification::make()
                 ->title('Nginx Yeniden Başlatma Hatası')
                 ->body('Nginx yeniden başlatılırken hata oluştu: ' . $e->getMessage())

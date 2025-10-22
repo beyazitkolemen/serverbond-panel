@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Filament\Actions\Nginx;
 
+use App\Actions\Nginx\StopService;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
-use Illuminate\Support\Facades\Process;
+use Throwable;
 
 class StopAction extends Action
 {
@@ -27,31 +28,44 @@ class StopAction extends Action
             ->modalDescription('Nginx servisi durdurulacak. Bu işlem web sitelerini erişilemez hale getirebilir.')
             ->modalSubmitActionLabel('Durdur')
             ->action(function (): void {
-                $this->executeScript();
+                $this->executeAction();
             });
     }
 
-    private function executeScript(): void
+    private function executeAction(): void
     {
         try {
-            $scriptPath = config('serverbond-action.base_dir') . '/nginx/stop.sh';
-            
-            $result = Process::timeout(config('serverbond-action.execution.timeout', 300))
-                ->run("bash {$scriptPath}");
+            $result = app(StopService::class)->execute();
 
-            if ($result->successful()) {
-                $output = $result->output();
-                $data = json_decode($output, true);
+            $status = $result['status'] ?? null;
+            $message = $result['message'] ?? null;
 
+            if ($status === 'success') {
                 Notification::make()
                     ->title('Nginx Durduruldu')
-                    ->body($data['message'] ?? 'Nginx servisi başarıyla durduruldu')
+                    ->body($message ?? 'Nginx servisi başarıyla durduruldu')
                     ->warning()
                     ->send();
-            } else {
-                throw new \Exception($result->errorOutput());
+
+                return;
             }
-        } catch (\Exception $e) {
+
+            if ($status === 'warning') {
+                Notification::make()
+                    ->title('Nginx Durdurma Uyarısı')
+                    ->body($message ?? 'Nginx durdurulurken uyarılar oluştu')
+                    ->warning()
+                    ->send();
+
+                return;
+            }
+
+            Notification::make()
+                ->title('Nginx Durdurma Hatası')
+                ->body($message ?? 'Nginx durdurulurken hata oluştu')
+                ->danger()
+                ->send();
+        } catch (Throwable $e) {
             Notification::make()
                 ->title('Nginx Durdurma Hatası')
                 ->body('Nginx durdurulurken hata oluştu: ' . $e->getMessage())

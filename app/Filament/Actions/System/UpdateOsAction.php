@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Filament\Actions\System;
 
+use App\Actions\System\UpdateOsService;
 use Filament\Actions\Action;
-use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
-use Illuminate\Support\Facades\Process;
+use Throwable;
 
 class UpdateOsAction extends Action
 {
@@ -28,31 +28,44 @@ class UpdateOsAction extends Action
             ->modalDescription('Apt paketlerini güncelleyecek ve yükseltecek. Bu işlem sistem yeniden başlatması gerektirebilir.')
             ->modalSubmitActionLabel('Güncelle')
             ->action(function (): void {
-                $this->executeScript();
+                $this->executeAction();
             });
     }
 
-    private function executeScript(): void
+    private function executeAction(): void
     {
         try {
-            $scriptPath = config('serverbond-action.base_dir') . '/system/update_os.sh';
-            
-            $result = Process::timeout(config('serverbond-action.execution.timeout', 300))
-                ->run("bash {$scriptPath}");
+            $result = app(UpdateOsService::class)->execute();
 
-            if ($result->successful()) {
-                $output = $result->output();
-                $data = json_decode($output, true);
+            $status = $result['status'] ?? null;
+            $message = $result['message'] ?? null;
 
+            if ($status === 'success') {
                 Notification::make()
                     ->title('Sistem Güncelleme Başarılı')
-                    ->body($data['message'] ?? 'Paketler başarıyla güncellendi')
+                    ->body($message ?? 'Paketler başarıyla güncellendi')
                     ->success()
                     ->send();
-            } else {
-                throw new \Exception($result->errorOutput());
+
+                return;
             }
-        } catch (\Exception $e) {
+
+            if ($status === 'warning') {
+                Notification::make()
+                    ->title('Sistem Güncelleme Uyarısı')
+                    ->body($message ?? 'Güncelleme sırasında uyarılar oluştu')
+                    ->warning()
+                    ->send();
+
+                return;
+            }
+
+            Notification::make()
+                ->title('Sistem Güncelleme Hatası')
+                ->body($message ?? 'Güncelleme sırasında hata oluştu')
+                ->danger()
+                ->send();
+        } catch (Throwable $e) {
             Notification::make()
                 ->title('Sistem Güncelleme Hatası')
                 ->body('Güncelleme sırasında hata oluştu: ' . $e->getMessage())

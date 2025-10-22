@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Filament\Actions\Meta;
 
+use App\Actions\Meta\HealthService;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
-use Illuminate\Support\Facades\Process;
+use Throwable;
 
 class HealthAction extends Action
 {
@@ -23,39 +24,44 @@ class HealthAction extends Action
             ->icon('heroicon-o-heart')
             ->color('success')
             ->action(function (): void {
-                $this->executeScript();
+                $this->executeAction();
             });
     }
 
-    private function executeScript(): void
+    private function executeAction(): void
     {
         try {
-            $scriptPath = config('serverbond-action.base_dir') . '/meta/health.sh';
-            
-            $result = Process::timeout(config('serverbond-action.execution.timeout', 300))
-                ->run("bash {$scriptPath}");
+            $result = app(HealthService::class)->execute();
 
-            if ($result->successful()) {
-                $output = $result->output();
-                $data = json_decode($output, true);
+            $status = $result['status'] ?? null;
+            $message = $result['message'] ?? null;
 
-                if ($data && isset($data['status']) && $data['status'] === 'success') {
-                    Notification::make()
-                        ->title('Agent Sağlıklı')
-                        ->body($data['message'] ?? 'Tüm sistemler normal çalışıyor')
-                        ->success()
-                        ->send();
-                } else {
-                    Notification::make()
-                        ->title('Agent Sağlık Uyarısı')
-                        ->body($data['message'] ?? 'Bazı sistemlerde sorun tespit edildi')
-                        ->warning()
-                        ->send();
-                }
-            } else {
-                throw new \Exception($result->errorOutput());
+            if ($status === 'success') {
+                Notification::make()
+                    ->title('Agent Sağlıklı')
+                    ->body($message ?? 'Tüm sistemler normal çalışıyor')
+                    ->success()
+                    ->send();
+
+                return;
             }
-        } catch (\Exception $e) {
+
+            if ($status === 'warning') {
+                Notification::make()
+                    ->title('Agent Sağlık Uyarısı')
+                    ->body($message ?? 'Bazı sistemlerde sorun tespit edildi')
+                    ->warning()
+                    ->send();
+
+                return;
+            }
+
+            Notification::make()
+                ->title('Sağlık Kontrolü Hatası')
+                ->body($message ?? 'Sağlık kontrolü başarısız oldu')
+                ->danger()
+                ->send();
+        } catch (Throwable $e) {
             Notification::make()
                 ->title('Sağlık Kontrolü Hatası')
                 ->body('Sağlık kontrolü sırasında hata oluştu: ' . $e->getMessage())

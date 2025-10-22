@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Filament\Actions\Nginx;
 
+use App\Actions\Nginx\InstallService;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
-use Illuminate\Support\Facades\Process;
+use Throwable;
 
 class InstallAction extends Action
 {
@@ -27,31 +28,44 @@ class InstallAction extends Action
             ->modalDescription('Nginx kurulacak ve temel optimizasyonlar yapılacak.')
             ->modalSubmitActionLabel('Kur')
             ->action(function (): void {
-                $this->executeScript();
+                $this->executeAction();
             });
     }
 
-    private function executeScript(): void
+    private function executeAction(): void
     {
         try {
-            $scriptPath = config('serverbond-action.base_dir') . '/nginx/install.sh';
-            
-            $result = Process::timeout(config('serverbond-action.execution.timeout', 300))
-                ->run("bash {$scriptPath}");
+            $result = app(InstallService::class)->execute();
 
-            if ($result->successful()) {
-                $output = $result->output();
-                $data = json_decode($output, true);
+            $status = $result['status'] ?? null;
+            $message = $result['message'] ?? null;
 
+            if ($status === 'success') {
                 Notification::make()
                     ->title('Nginx Kurulumu Başarılı')
-                    ->body($data['message'] ?? 'Nginx başarıyla kuruldu ve yapılandırıldı')
+                    ->body($message ?? 'Nginx başarıyla kuruldu ve yapılandırıldı')
                     ->success()
                     ->send();
-            } else {
-                throw new \Exception($result->errorOutput());
+
+                return;
             }
-        } catch (\Exception $e) {
+
+            if ($status === 'warning') {
+                Notification::make()
+                    ->title('Nginx Kurulumu')
+                    ->body($message ?? 'Nginx kurulumu sırasında uyarılar oluştu')
+                    ->warning()
+                    ->send();
+
+                return;
+            }
+
+            Notification::make()
+                ->title('Nginx Kurulum Hatası')
+                ->body($message ?? 'Nginx kurulumu sırasında hata oluştu')
+                ->danger()
+                ->send();
+        } catch (Throwable $e) {
             Notification::make()
                 ->title('Nginx Kurulum Hatası')
                 ->body('Nginx kurulumu sırasında hata oluştu: ' . $e->getMessage())

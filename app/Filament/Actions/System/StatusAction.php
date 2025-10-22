@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Filament\Actions\System;
 
+use App\Actions\System\StatusService;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
-use Illuminate\Support\Facades\Process;
+use Throwable;
 
 class StatusAction extends Action
 {
@@ -23,42 +24,52 @@ class StatusAction extends Action
             ->icon('heroicon-o-chart-bar')
             ->color('info')
             ->action(function (): void {
-                $this->executeScript();
+                $this->executeAction();
             });
     }
 
-    private function executeScript(): void
+    private function executeAction(): void
     {
         try {
-            $scriptPath = config('serverbond-action.base_dir') . '/system/status.sh';
-            
-            $result = Process::timeout(config('serverbond-action.execution.timeout', 300))
-                ->run("bash {$scriptPath}");
+            $result = app(StatusService::class)->execute();
 
-            if ($result->successful()) {
-                $output = $result->output();
-                $data = json_decode($output, true);
+            $status = $result['status'] ?? null;
+            $message = $result['message'] ?? null;
+            $data = $result['data'] ?? null;
 
-                if ($data && isset($data['data'])) {
-                    $status = $data['data'];
-                    $message = "CPU: {$status['cpu_usage']}% | RAM: {$status['memory_usage']}% | Disk: {$status['disk_usage']}% | Load: {$status['load_average']}";
-                    
-                    Notification::make()
-                        ->title('Sistem Durumu')
-                        ->body($message)
-                        ->success()
-                        ->send();
-                } else {
-                    Notification::make()
-                        ->title('Sistem Durumu')
-                        ->body($data['message'] ?? 'Sistem durumu alındı')
-                        ->info()
-                        ->send();
+            if ($status === 'success') {
+                if (is_array($data)) {
+                    $message = 'CPU: ' . ($data['cpu_usage'] ?? 'N/A') . '%'
+                        . ' | RAM: ' . ($data['memory_usage'] ?? 'N/A') . '%'
+                        . ' | Disk: ' . ($data['disk_usage'] ?? 'N/A') . '%'
+                        . ' | Load: ' . ($data['load_average'] ?? 'N/A');
                 }
-            } else {
-                throw new \Exception($result->errorOutput());
+
+                Notification::make()
+                    ->title('Sistem Durumu')
+                    ->body($message ?? 'Sistem durumu alındı')
+                    ->success()
+                    ->send();
+
+                return;
             }
-        } catch (\Exception $e) {
+
+            if ($status === 'warning') {
+                Notification::make()
+                    ->title('Sistem Durumu')
+                    ->body($message ?? 'Sistem durumu alınırken uyarılar oluştu')
+                    ->warning()
+                    ->send();
+
+                return;
+            }
+
+            Notification::make()
+                ->title('Sistem Durumu Hatası')
+                ->body($message ?? 'Durum bilgisi alınamadı')
+                ->danger()
+                ->send();
+        } catch (Throwable $e) {
             Notification::make()
                 ->title('Sistem Durumu Hatası')
                 ->body('Durum bilgisi alınırken hata oluştu: ' . $e->getMessage())

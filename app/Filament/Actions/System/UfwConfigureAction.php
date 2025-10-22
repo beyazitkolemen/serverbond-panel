@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Filament\Actions\System;
 
+use App\Actions\System\UfwConfigureService;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
-use Illuminate\Support\Facades\Process;
+use Throwable;
 
 class UfwConfigureAction extends Action
 {
@@ -27,31 +28,44 @@ class UfwConfigureAction extends Action
             ->modalDescription('UFW firewall kurulacak ve temel kurallar (80/443/22) eklenecek.')
             ->modalSubmitActionLabel('Kur ve Yapılandır')
             ->action(function (): void {
-                $this->executeScript();
+                $this->executeAction();
             });
     }
 
-    private function executeScript(): void
+    private function executeAction(): void
     {
         try {
-            $scriptPath = config('serverbond-action.base_dir') . '/system/ufw_configure.sh';
-            
-            $result = Process::timeout(config('serverbond-action.execution.timeout', 300))
-                ->run("bash {$scriptPath}");
+            $result = app(UfwConfigureService::class)->execute();
 
-            if ($result->successful()) {
-                $output = $result->output();
-                $data = json_decode($output, true);
+            $status = $result['status'] ?? null;
+            $message = $result['message'] ?? null;
 
+            if ($status === 'success') {
                 Notification::make()
                     ->title('UFW Firewall Kurulumu Başarılı')
-                    ->body($data['message'] ?? 'UFW firewall başarıyla kuruldu ve yapılandırıldı')
+                    ->body($message ?? 'UFW firewall başarıyla kuruldu ve yapılandırıldı')
                     ->success()
                     ->send();
-            } else {
-                throw new \Exception($result->errorOutput());
+
+                return;
             }
-        } catch (\Exception $e) {
+
+            if ($status === 'warning') {
+                Notification::make()
+                    ->title('UFW Firewall Kurulumu')
+                    ->body($message ?? 'UFW kurulumu sırasında uyarılar oluştu')
+                    ->warning()
+                    ->send();
+
+                return;
+            }
+
+            Notification::make()
+                ->title('UFW Kurulum Hatası')
+                ->body($message ?? 'UFW kurulumu sırasında hata oluştu')
+                ->danger()
+                ->send();
+        } catch (Throwable $e) {
             Notification::make()
                 ->title('UFW Kurulum Hatası')
                 ->body('UFW kurulumu sırasında hata oluştu: ' . $e->getMessage())

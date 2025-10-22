@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Filament\Actions\Meta;
 
+use App\Actions\Meta\UpdateService;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
-use Illuminate\Support\Facades\Process;
+use Throwable;
 
 class UpdateAction extends Action
 {
@@ -27,31 +28,44 @@ class UpdateAction extends Action
             ->modalDescription('Agent kendini güncelleyecek (git pull + service restart). Bu işlem sırasında agent geçici olarak kullanılamayabilir.')
             ->modalSubmitActionLabel('Güncelle')
             ->action(function (): void {
-                $this->executeScript();
+                $this->executeAction();
             });
     }
 
-    private function executeScript(): void
+    private function executeAction(): void
     {
         try {
-            $scriptPath = config('serverbond-action.base_dir') . '/meta/update.sh';
-            
-            $result = Process::timeout(config('serverbond-action.execution.timeout', 300))
-                ->run("bash {$scriptPath}");
+            $result = app(UpdateService::class)->execute();
 
-            if ($result->successful()) {
-                $output = $result->output();
-                $data = json_decode($output, true);
+            $status = $result['status'] ?? null;
+            $message = $result['message'] ?? null;
 
+            if ($status === 'success') {
                 Notification::make()
                     ->title('Agent Güncelleme Başarılı')
-                    ->body($data['message'] ?? 'Agent başarıyla güncellendi')
+                    ->body($message ?? 'Agent başarıyla güncellendi')
                     ->success()
                     ->send();
-            } else {
-                throw new \Exception($result->errorOutput());
+
+                return;
             }
-        } catch (\Exception $e) {
+
+            if ($status === 'warning') {
+                Notification::make()
+                    ->title('Agent Güncelleme Uyarısı')
+                    ->body($message ?? 'Güncelleme sırasında uyarılar oluştu')
+                    ->warning()
+                    ->send();
+
+                return;
+            }
+
+            Notification::make()
+                ->title('Agent Güncelleme Hatası')
+                ->body($message ?? 'Güncelleme sırasında hata oluştu')
+                ->danger()
+                ->send();
+        } catch (Throwable $e) {
             Notification::make()
                 ->title('Agent Güncelleme Hatası')
                 ->body('Güncelleme sırasında hata oluştu: ' . $e->getMessage())

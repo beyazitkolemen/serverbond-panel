@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Filament\Actions\Nginx;
 
+use App\Actions\Nginx\ReloadService;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
-use Illuminate\Support\Facades\Process;
+use Throwable;
 
 class ReloadAction extends Action
 {
@@ -23,31 +24,44 @@ class ReloadAction extends Action
             ->icon('heroicon-o-arrow-path')
             ->color('info')
             ->action(function (): void {
-                $this->executeScript();
+                $this->executeAction();
             });
     }
 
-    private function executeScript(): void
+    private function executeAction(): void
     {
         try {
-            $scriptPath = config('serverbond-action.base_dir') . '/nginx/reload.sh';
-            
-            $result = Process::timeout(config('serverbond-action.execution.timeout', 300))
-                ->run("bash {$scriptPath}");
+            $result = app(ReloadService::class)->execute();
 
-            if ($result->successful()) {
-                $output = $result->output();
-                $data = json_decode($output, true);
+            $status = $result['status'] ?? null;
+            $message = $result['message'] ?? null;
 
+            if ($status === 'success') {
                 Notification::make()
                     ->title('Nginx Konfig Reload Başarılı')
-                    ->body($data['message'] ?? 'Nginx konfigürasyonu başarıyla yeniden yüklendi')
+                    ->body($message ?? 'Nginx konfigürasyonu başarıyla yeniden yüklendi')
                     ->success()
                     ->send();
-            } else {
-                throw new \Exception($result->errorOutput());
+
+                return;
             }
-        } catch (\Exception $e) {
+
+            if ($status === 'warning') {
+                Notification::make()
+                    ->title('Nginx Konfig Reload Uyarısı')
+                    ->body($message ?? 'Nginx konfigürasyonu yeniden yüklenirken uyarılar oluştu')
+                    ->warning()
+                    ->send();
+
+                return;
+            }
+
+            Notification::make()
+                ->title('Nginx Reload Hatası')
+                ->body($message ?? 'Nginx konfigürasyonu yeniden yüklenemedi')
+                ->danger()
+                ->send();
+        } catch (Throwable $e) {
             Notification::make()
                 ->title('Nginx Reload Hatası')
                 ->body('Nginx konfig reload sırasında hata oluştu: ' . $e->getMessage())

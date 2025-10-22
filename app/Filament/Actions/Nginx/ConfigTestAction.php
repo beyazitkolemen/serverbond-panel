@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Filament\Actions\Nginx;
 
+use App\Actions\Nginx\ConfigTestService;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
-use Illuminate\Support\Facades\Process;
+use Throwable;
 
 class ConfigTestAction extends Action
 {
@@ -23,36 +24,44 @@ class ConfigTestAction extends Action
             ->icon('heroicon-o-check-circle')
             ->color('info')
             ->action(function (): void {
-                $this->executeScript();
+                $this->executeAction();
             });
     }
 
-    private function executeScript(): void
+    private function executeAction(): void
     {
         try {
-            $scriptPath = config('serverbond-action.base_dir') . '/nginx/config_test.sh';
-            
-            $result = Process::timeout(config('serverbond-action.execution.timeout', 300))
-                ->run("bash {$scriptPath}");
+            $result = app(ConfigTestService::class)->execute();
 
-            if ($result->successful()) {
-                $output = $result->output();
-                $data = json_decode($output, true);
+            $status = $result['status'] ?? null;
+            $message = $result['message'] ?? null;
 
+            if ($status === 'success') {
                 Notification::make()
                     ->title('Nginx Konfig Test Başarılı')
-                    ->body($data['message'] ?? 'Nginx konfigürasyonu geçerli')
+                    ->body($message ?? 'Nginx konfigürasyonu geçerli')
                     ->success()
                     ->send();
-            } else {
-                $errorOutput = $result->errorOutput();
-                Notification::make()
-                    ->title('Nginx Konfig Test Hatası')
-                    ->body('Konfigürasyon hatası: ' . $errorOutput)
-                    ->danger()
-                    ->send();
+
+                return;
             }
-        } catch (\Exception $e) {
+
+            if ($status === 'warning') {
+                Notification::make()
+                    ->title('Nginx Konfig Test Uyarısı')
+                    ->body($message ?? 'Konfigürasyon testi uyarılarla tamamlandı')
+                    ->warning()
+                    ->send();
+
+                return;
+            }
+
+            Notification::make()
+                ->title('Nginx Konfig Test Hatası')
+                ->body($message ?? 'Konfigürasyon hatası oluştu')
+                ->danger()
+                ->send();
+        } catch (Throwable $e) {
             Notification::make()
                 ->title('Nginx Konfig Test Hatası')
                 ->body('Konfig test sırasında hata oluştu: ' . $e->getMessage())
