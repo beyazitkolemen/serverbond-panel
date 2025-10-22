@@ -11,6 +11,8 @@ use Filament\Forms\Components\Toggle;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\DateTimePicker;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Grid;
 
 class SiteForm
 {
@@ -18,47 +20,70 @@ class SiteForm
     {
         return $schema
             ->components([
-                TextInput::make('name')
-                    ->required(),
-                TextInput::make('domain')
-                    ->required(),
-                Select::make('type')
-                    ->options(SiteType::class)
-                    ->default('laravel')
-                    ->required(),
-                TextInput::make('root_directory')
-                    ->required()
-                    ->default('/var/www'),
-                TextInput::make('public_directory'),
-                TextInput::make('git_repository'),
-                TextInput::make('git_branch')
-                    ->required()
-                    ->default('main'),
-                TextInput::make('git_deploy_key'),
-                Select::make('status')
-                    ->options(SiteStatus::class)
-                    ->default('inactive')
-                    ->required(),
-                Select::make('php_version')
-                    ->options(PHPVersion::class)
-                    ->default(PHPVersion::PHP84)
-                    ->required(),
-                TextInput::make('database_name'),
-                TextInput::make('database_user'),
-                TextInput::make('database_password')
-                    ->password(),
-                Toggle::make('ssl_enabled')
-                    ->required(),
-                Toggle::make('auto_deploy')
-                    ->required(),
-                TextInput::make('cloudflare_tunnel_id'),
-                Toggle::make('cloudflare_tunnel_enabled')
-                    ->required(),
-                DateTimePicker::make('last_deployed_at'),
-                Textarea::make('notes')
-                    ->columnSpanFull(),
-                Textarea::make('deployment_script')
-                    ->columnSpanFull(),
+                Section::make('Temel Bilgiler')
+                    ->description('Site ile ilgili temel bilgileri girin')
+                    ->icon('heroicon-o-information-circle')
+                    ->schema([
+                        TextInput::make('name')
+                            ->label('Site Adı')
+                            ->required()
+                            ->maxLength(255),
+                        TextInput::make('domain')
+                            ->label('Domain')
+                            ->required()
+                            ->url()
+                            ->maxLength(255),
+                        TextInput::make('git_repository')
+                            ->label('Git Repository')
+                            ->url()
+                            ->helperText('Git repository URL\'si'),
+                        TextInput::make('git_branch')
+                            ->label('Git Branch')
+                            ->required()
+                            ->default('main'),
+                        Select::make('type')
+                            ->label('Site Tipi')
+                            ->options(SiteType::class)
+                            ->default('laravel')
+                            ->required(),
+                        Select::make('php_version')
+                            ->label('PHP Versiyonu')
+                            ->options(PHPVersion::class)
+                            ->default(PHPVersion::PHP84)
+                            ->required(),
+
+                    ])
+                    ->columns(2)->columnSpanFull(),
+
+
+
+
+
+
+
+                Section::make('Deployment Script')
+                    ->description('Özel deployment script\'i')
+                    ->icon('heroicon-o-command-line')
+                    ->schema([
+                        Textarea::make('deployment_script')
+                            ->label('Deployment Script')
+                            ->rows(10)
+                            ->helperText('Deploy sırasında çalıştırılacak özel komutlar')
+                            ->columnSpanFull(),
+                    ])
+                    ->collapsible()->visibleOn('edit'),
+
+                Section::make('Notlar')
+                    ->description('Site hakkında ek notlar')
+                    ->icon('heroicon-o-document-text')
+                    ->schema([
+                        Textarea::make('notes')
+                            ->label('Notlar')
+                            ->rows(4)
+                            ->helperText('Site hakkında önemli notlar ve açıklamalar')
+                            ->columnSpanFull(),
+                    ])
+                    ->collapsible()->visibleOn('edit'),
             ]);
     }
 }
