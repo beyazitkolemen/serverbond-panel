@@ -2,12 +2,13 @@
 
 namespace App\Services;
 
-use App\Actions\Mysql\CreateDatabaseService;
 use App\Models\Site;
+use Illuminate\Support\Str;
+use App\Actions\Php\RestartService;
 use App\Actions\Nginx\AddSiteService;
 use App\Actions\Mysql\CreateUserService;
+use App\Actions\Mysql\CreateDatabaseService;
 use App\Actions\Mysql\GrantPrivilegesService;
-use App\Actions\Php\RestartService;
 
 class AppService
 {
@@ -45,9 +46,9 @@ class AppService
     }
     public function generateDatabaseCredentials(Site $site): array
     {
-        $databaseName = Str::random(10);
-        $databaseUser = Str::random(10);
-        $databasePassword = Str::random(10);
+        $databaseName = 'db_' . Str::random(10);
+        $databaseUser = 'user_' . Str::random(10);
+        $databasePassword = 'password_' . Str::random(10);
 
         $site->database_name = $databaseName;
         $site->database_user = $databaseUser;
