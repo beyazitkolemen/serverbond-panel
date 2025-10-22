@@ -7,10 +7,12 @@ namespace App\Filament\Resources\Sites\Tables;
 use App\Enums\DeploymentTrigger;
 use App\Enums\SiteStatus;
 use App\Enums\SiteType;
+use App\Actions\Nginx\AddSiteService;
+use App\Actions\Nginx\ConfigTestService as NginxConfigTestService;
+use App\Actions\Nginx\ReloadService as NginxReloadService;
+use App\Models\Site;
 use App\Services\CloudflareService;
 use App\Services\DeploymentService;
-use App\Services\MySQLService;
-use App\Services\NginxService;
 use App\Services\RedisService;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Textarea;
@@ -263,59 +265,48 @@ class SitesTable
                     ->modalHeading('Nginx Yapılandırılsın mı?')
                     ->modalDescription(fn ($record) => "'{$record->domain}' için Nginx config oluşturulup aktifleştirilecek.")
                     ->action(function ($record) {
-                        $nginxService = app(NginxService::class);
+                        $addSiteService = app(AddSiteService::class);
+                        $configTestService = app(NginxConfigTestService::class);
+                        $reloadService = app(NginxReloadService::class);
 
                         try {
-                            // Config oluştur
-                            $config = $nginxService->generateConfig($record);
+                            $siteType = $record->type;
+                            $result = $addSiteService->execute(
+                                domain: $record->domain,
+                                type: self::mapSiteTypeForNginx($siteType),
+                                root: self::resolveDocumentRoot($record),
+                                phpVersion: self::resolvePhpVersion($record),
+                                upstreamPort: self::resolveUpstreamPort($siteType),
+                            );
 
-                            // Config dosyasını yaz
-                            $writeResult = $nginxService->writeConfig($record, $config);
-                            if (!$writeResult['success']) {
+                            if (($result['status'] ?? null) !== 'success') {
                                 Notification::make()
-                                    ->title('Nginx Hatası')
+                                    ->title('Nginx Yapılandırma Hatası')
                                     ->danger()
-                                    ->body($writeResult['error'] ?? 'Konfigürasyon dosyası yazılamadı.')
-                                    ->persistent()
+                                    ->body($result['message'] ?? 'Site için konfigürasyon oluşturulamadı.')
                                     ->send();
 
                                 return;
                             }
 
-                            // Site'ı enable et
-                            $enableResult = $nginxService->enableSite($record);
-                            if (!$enableResult['success']) {
-                                Notification::make()
-                                    ->title('Nginx Hatası')
-                                    ->danger()
-                                    ->body($enableResult['error'] ?? 'Site linki oluşturulamadı.')
-                                    ->persistent()
-                                    ->send();
-
-                                return;
-                            }
-
-                            // Config test et
-                            $test = $nginxService->testConfig();
-
-                            if (!$test['success']) {
+                            $testResult = $configTestService->execute();
+                            if (($testResult['status'] ?? null) !== 'success') {
                                 Notification::make()
                                     ->title('Nginx Test Hatası')
                                     ->danger()
-                                    ->body($test['error'] ?: 'nginx -t başarısız oldu. Config dosyasını kontrol edin.')
+                                    ->body($testResult['message'] ?? 'nginx -t başarısız oldu. Config dosyasını kontrol edin.')
                                     ->persistent()
                                     ->send();
 
                                 return;
                             }
 
-                            $reload = $nginxService->reload();
-
-                            if (! $reload['success']) {
+                            $reloadResult = $reloadService->execute();
+                            if (($reloadResult['status'] ?? null) !== 'success') {
                                 Notification::make()
                                     ->title('Nginx Yeniden Yüklenemedi')
                                     ->danger()
-                                    ->body($reload['error'] ?: 'systemctl reload nginx başarısız oldu.')
+                                    ->body($reloadResult['message'] ?? 'systemctl reload nginx başarısız oldu.')
                                     ->send();
 
                                 return;
@@ -392,4 +383,46 @@ class SitesTable
             ->defaultSort('created_at', 'desc')
             ->poll('30s');
     }
+
+    private static function resolveDocumentRoot(Site $site): string
+    {
+        $baseDirectory = rtrim($site->root_directory ?? '/srv/serverbond/sites', '/');
+        $basePath = $baseDirectory . '/' . $site->domain;
+
+        if (in_array($site->type, [SiteType::Laravel, SiteType::PHP, SiteType::Static], true)) {
+            $publicDirectory = trim((string) ($site->public_directory ?: 'public'), '/');
+
+            return $publicDirectory !== ''
+                ? $basePath . '/' . $publicDirectory
+                : $basePath;
+        }
+
+        return $basePath;
+    }
+
+    private static function resolvePhpVersion(Site $site): ?string
+    {
+        return match ($site->type) {
+            SiteType::Laravel, SiteType::PHP => $site->php_version ?? config('deployment.nginx.default_php_version'),
+            default => null,
+        };
+    }
+
+    private static function resolveUpstreamPort(SiteType $type): ?int
+    {
+        return match ($type) {
+            SiteType::NodeJS => (int) config('deployment.ports.nodejs'),
+            SiteType::Python => (int) config('deployment.ports.python'),
+            default => null,
+        };
+    }
+
+    private static function mapSiteTypeForNginx(SiteType $type): string
+    {
+        return match ($type) {
+            SiteType::NodeJS => 'node',
+            default => $type->value,
+        };
+    }
+
 }

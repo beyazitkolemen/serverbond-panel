@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\Databases\Tables;
 
+use App\Actions\Mysql\CreateDatabaseService;
+use App\Actions\Mysql\CreateUserService;
+use App\Actions\Mysql\DeleteDatabaseService;
+use App\Actions\Mysql\DeleteUserService;
 use App\Services\MySQLService;
 use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
@@ -102,37 +106,48 @@ class DatabasesTable
                     ->modalHeading('MySQL\'de Oluştur')
                     ->modalDescription(fn($record) => "'{$record->name}' database ve kullanıcısı MySQL server'da oluşturulacak.")
                     ->action(function ($record) {
-                        $mysqlService = app(MySQLService::class);
+                        $createDatabaseService = app(CreateDatabaseService::class);
+                        $createUserService = app(CreateUserService::class);
 
                         try {
-                            // Database oluştur
-                            $dbCreated = $mysqlService->createDatabase($record->name);
+                            $dbResult = $createDatabaseService->execute(
+                                name: $record->name,
+                                charset: $record->charset ?? 'utf8mb4',
+                                collation: $record->collation ?? 'utf8mb4_unicode_ci',
+                            );
 
-                            // Kullanıcı oluştur
-                            $userCreated = $mysqlService->createUser($record->username, $record->password);
-
-                            // İzinleri ver
-                            $privilegesGranted = $mysqlService->grantPrivileges($record->name, $record->username);
-
-                            if ($dbCreated && $userCreated && $privilegesGranted) {
+                            if (($dbResult['status'] ?? null) !== 'success') {
                                 Notification::make()
-                                    ->title('MySQL Database Oluşturuldu')
-                                    ->success()
-                                    ->body("'{$record->name}' başarıyla MySQL'de oluşturuldu.")
+                                    ->title('Database Oluşturulamadı')
+                                    ->danger()
+                                    ->body($dbResult['message'] ?? "'{$record->name}' MySQL'de oluşturulamadı.")
                                     ->send();
-                            } else {
-                                Notification::make()
-                                    ->title('Kısmi Başarı')
-                                    ->warning()
-                                    ->body(sprintf(
-                                        'Database: %s, User: %s, Privileges: %s',
-                                        $dbCreated ? 'OK' : 'FAIL',
-                                        $userCreated ? 'OK' : 'FAIL',
-                                        $privilegesGranted ? 'OK' : 'FAIL'
-                                    ))
-                                    ->send();
+
+                                return;
                             }
-                        } catch (\Exception $e) {
+
+                            $userResult = $createUserService->execute(
+                                username: $record->username,
+                                password: $record->password,
+                                database: $record->name,
+                            );
+
+                            if (($userResult['status'] ?? null) !== 'success') {
+                                Notification::make()
+                                    ->title('Kullanıcı Oluşturulamadı')
+                                    ->danger()
+                                    ->body($userResult['message'] ?? "'{$record->username}' kullanıcısı oluşturulamadı.")
+                                    ->send();
+
+                                return;
+                            }
+
+                            Notification::make()
+                                ->title('MySQL Database Oluşturuldu')
+                                ->success()
+                                ->body("'{$record->name}' başarıyla MySQL'de oluşturuldu.")
+                                ->send();
+                        } catch (\Throwable $e) {
                             Notification::make()
                                 ->title('MySQL Hatası')
                                 ->danger()
@@ -187,12 +202,13 @@ class DatabasesTable
                     ->requiresConfirmation()
                     ->before(function ($record) {
                         // Database silinmeden önce MySQL'den de sil
-                        $mysqlService = app(MySQLService::class);
+                        $deleteDatabaseService = app(DeleteDatabaseService::class);
+                        $deleteUserService = app(DeleteUserService::class);
 
                         try {
-                            $mysqlService->deleteDatabase($record->name);
-                            $mysqlService->deleteUser($record->username);
-                        } catch (\Exception $e) {
+                            $deleteDatabaseService->execute($record->name);
+                            $deleteUserService->execute($record->username);
+                        } catch (\Throwable $e) {
                             // MySQL'de yoksa hata verme
                             \Log::warning('MySQL database/user deletion failed', [
                                 'database' => $record->name,
