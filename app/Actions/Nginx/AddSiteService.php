@@ -13,30 +13,18 @@ class AddSiteService extends BaseServerBondService
      */
     public function execute(
         string $domain,
-        string $type,
         string $root,
-        ?string $phpVersion = null,
-        ?int $upstreamPort = null,
-        ?string $serverAlias = null
+        ?string $template = null
     ): array {
         $params = [
             'domain' => $domain,
-            'type' => $type,
-            'document_root' => $root, // Script'te $DOCUMENT_ROOT olarak bekleniyor
+            'root' => $root,
         ];
 
-        $this->validateParams($params, ['domain', 'type', 'document_root']);
+        $this->validateParams($params, ['domain', 'root']);
 
-        if ($phpVersion) {
-            $params['php_version'] = $phpVersion;
-        }
-
-        if ($upstreamPort) {
-            $params['upstream_port'] = $upstreamPort;
-        }
-
-        if ($serverAlias) {
-            $params['server_alias'] = $serverAlias;
+        if ($template) {
+            $params['template'] = $template;
         }
 
         return $this->executeScript($this->getScriptPath('nginx', 'add_site'), $params);
