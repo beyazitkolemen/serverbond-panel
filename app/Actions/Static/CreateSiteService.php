@@ -13,13 +13,13 @@ class CreateSiteService extends BaseServerBondService
      */
     public function execute(string $domain, string $root, bool $ssl = false, ?string $email = null): array
     {
-        $this->validateParams(['domain', 'root'], ['domain', 'root']);
-        
         $params = [
             'domain' => $domain,
             'root' => $root,
-            'ssl' => $ssl
+            'ssl' => $ssl,
         ];
+
+        $this->validateParams($params, ['domain', 'root']);
 
         if ($email) {
             $params['email'] = $email;

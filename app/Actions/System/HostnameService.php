@@ -23,11 +23,13 @@ class HostnameService extends BaseServerBondService
      */
     public function set(string $hostname): array
     {
-        $this->validateParams(['hostname'], ['hostname']);
-        
-        return $this->executeScript($this->getScriptPath('system', 'hostname'), [
+        $params = [
             'action' => 'set',
-            'hostname' => $hostname
-        ]);
+            'hostname' => $hostname,
+        ];
+
+        $this->validateParams($params, ['hostname']);
+
+        return $this->executeScript($this->getScriptPath('system', 'hostname'), $params);
     }
 }

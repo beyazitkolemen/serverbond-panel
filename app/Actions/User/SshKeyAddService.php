@@ -13,11 +13,13 @@ class SshKeyAddService extends BaseServerBondService
      */
     public function execute(string $username, string $publicKey): array
     {
-        $this->validateParams(['username', 'public_key'], ['username', 'public_key']);
-        
-        return $this->executeScript($this->getScriptPath('user', 'ssh_key_add'), [
+        $params = [
             'username' => $username,
-            'public_key' => $publicKey
-        ]);
+            'public_key' => $publicKey,
+        ];
+
+        $this->validateParams($params, ['username', 'public_key']);
+
+        return $this->executeScript($this->getScriptPath('user', 'ssh_key_add'), $params);
     }
 }

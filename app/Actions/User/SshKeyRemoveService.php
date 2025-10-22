@@ -13,11 +13,13 @@ class SshKeyRemoveService extends BaseServerBondService
      */
     public function execute(string $username, string $publicKeyFingerprint): array
     {
-        $this->validateParams(['username', 'public_key_fingerprint'], ['username', 'public_key_fingerprint']);
-        
-        return $this->executeScript($this->getScriptPath('user', 'ssh_key_remove'), [
+        $params = [
             'username' => $username,
-            'public_key_fingerprint' => $publicKeyFingerprint
-        ]);
+            'public_key_fingerprint' => $publicKeyFingerprint,
+        ];
+
+        $this->validateParams($params, ['username', 'public_key_fingerprint']);
+
+        return $this->executeScript($this->getScriptPath('user', 'ssh_key_remove'), $params);
     }
 }

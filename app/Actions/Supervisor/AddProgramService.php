@@ -13,11 +13,13 @@ class AddProgramService extends BaseServerBondService
      */
     public function execute(string $name, string $configBase64): array
     {
-        $this->validateParams(['name', 'config_base64'], ['name', 'config_base64']);
-        
-        return $this->executeScript($this->getScriptPath('supervisor', 'add_program'), [
+        $params = [
             'name' => $name,
-            'config_base64' => $configBase64
-        ]);
+            'config_base64' => $configBase64,
+        ];
+
+        $this->validateParams($params, ['name', 'config_base64']);
+
+        return $this->executeScript($this->getScriptPath('supervisor', 'add_program'), $params);
     }
 }

@@ -13,10 +13,12 @@ class EnableModeService extends BaseServerBondService
      */
     public function execute(string $project): array
     {
-        $this->validateParams(['project'], ['project']);
-        
-        return $this->executeScript($this->getScriptPath('maintenance', 'enable_mode'), [
-            'project' => $project
-        ]);
+        $params = [
+            'project' => $project,
+        ];
+
+        $this->validateParams($params, ['project']);
+
+        return $this->executeScript($this->getScriptPath('maintenance', 'enable_mode'), $params);
     }
 }

@@ -13,10 +13,12 @@ class Pm2AppRestartService extends BaseServerBondService
      */
     public function execute(string $name): array
     {
-        $this->validateParams(['name'], ['name']);
-        
-        return $this->executeScript($this->getScriptPath('node', 'pm2_app_restart'), [
-            'name' => $name
-        ]);
+        $params = [
+            'name' => $name,
+        ];
+
+        $this->validateParams($params, ['name']);
+
+        return $this->executeScript($this->getScriptPath('node', 'pm2_app_restart'), $params);
     }
 }

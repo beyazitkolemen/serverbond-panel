@@ -13,10 +13,12 @@ class DisableSslService extends BaseServerBondService
      */
     public function execute(string $domain): array
     {
-        $this->validateParams(['domain'], ['domain']);
-        
-        return $this->executeScript($this->getScriptPath('nginx', 'disable_ssl'), [
-            'domain' => $domain
-        ]);
+        $params = [
+            'domain' => $domain,
+        ];
+
+        $this->validateParams($params, ['domain']);
+
+        return $this->executeScript($this->getScriptPath('nginx', 'disable_ssl'), $params);
     }
 }

@@ -13,10 +13,12 @@ class RemoveSiteService extends BaseServerBondService
      */
     public function execute(string $domain): array
     {
-        $this->validateParams(['domain'], ['domain']);
-        
-        return $this->executeScript($this->getScriptPath('nginx', 'remove_site'), [
-            'domain' => $domain
-        ]);
+        $params = [
+            'domain' => $domain,
+        ];
+
+        $this->validateParams($params, ['domain']);
+
+        return $this->executeScript($this->getScriptPath('nginx', 'remove_site'), $params);
     }
 }

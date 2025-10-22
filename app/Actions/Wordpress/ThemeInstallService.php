@@ -13,12 +13,14 @@ class ThemeInstallService extends BaseServerBondService
      */
     public function execute(string $domain, string $slug, bool $activate = true): array
     {
-        $this->validateParams(['domain', 'slug'], ['domain', 'slug']);
-        
-        return $this->executeScript($this->getScriptPath('wp', 'theme_install'), [
+        $params = [
             'domain' => $domain,
             'slug' => $slug,
-            'activate' => $activate
-        ]);
+            'activate' => $activate,
+        ];
+
+        $this->validateParams($params, ['domain', 'slug']);
+
+        return $this->executeScript($this->getScriptPath('wp', 'theme_install'), $params);
     }
 }

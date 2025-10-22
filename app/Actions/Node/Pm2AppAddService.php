@@ -13,16 +13,22 @@ class Pm2AppAddService extends BaseServerBondService
      */
     public function execute(string $name, string $cwd, string $script, ?array $env = null): array
     {
-        $this->validateParams(['name', 'cwd', 'script'], ['name', 'cwd', 'script']);
-        
         $params = [
             'name' => $name,
             'cwd' => $cwd,
-            'script' => $script
+            'script' => $script,
         ];
 
-        if ($env) {
-            $params['env'] = json_encode($env);
+        $this->validateParams($params, ['name', 'cwd', 'script']);
+
+        if ($env !== null) {
+            $encodedEnv = json_encode($env);
+
+            if ($encodedEnv === false) {
+                throw new \RuntimeException('Failed to encode PM2 environment configuration to JSON');
+            }
+
+            $params['env'] = $encodedEnv;
         }
 
         return $this->executeScript($this->getScriptPath('node', 'pm2_app_add'), $params);

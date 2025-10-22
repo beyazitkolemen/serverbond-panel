@@ -13,11 +13,13 @@ class DeleteUserService extends BaseServerBondService
      */
     public function execute(string $username, string $host = '%'): array
     {
-        $this->validateParams(['username'], ['username']);
-        
-        return $this->executeScript($this->getScriptPath('mysql', 'delete_user'), [
+        $params = [
             'username' => $username,
-            'host' => $host
-        ]);
+            'host' => $host,
+        ];
+
+        $this->validateParams($params, ['username']);
+
+        return $this->executeScript($this->getScriptPath('mysql', 'delete_user'), $params);
     }
 }

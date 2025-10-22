@@ -13,10 +13,12 @@ class RemoveProgramService extends BaseServerBondService
      */
     public function execute(string $name): array
     {
-        $this->validateParams(['name'], ['name']);
-        
-        return $this->executeScript($this->getScriptPath('supervisor', 'remove_program'), [
-            'name' => $name
-        ]);
+        $params = [
+            'name' => $name,
+        ];
+
+        $this->validateParams($params, ['name']);
+
+        return $this->executeScript($this->getScriptPath('supervisor', 'remove_program'), $params);
     }
 }

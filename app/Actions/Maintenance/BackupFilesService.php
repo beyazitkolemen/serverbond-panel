@@ -13,11 +13,13 @@ class BackupFilesService extends BaseServerBondService
      */
     public function execute(string $path, string $dest): array
     {
-        $this->validateParams(['path', 'dest'], ['path', 'dest']);
-        
-        return $this->executeScript($this->getScriptPath('maintenance', 'backup_files'), [
+        $params = [
             'path' => $path,
-            'dest' => $dest
-        ]);
+            'dest' => $dest,
+        ];
+
+        $this->validateParams($params, ['path', 'dest']);
+
+        return $this->executeScript($this->getScriptPath('maintenance', 'backup_files'), $params);
     }
 }

@@ -13,11 +13,13 @@ class AddUserService extends BaseServerBondService
      */
     public function execute(string $username, bool $withSudo = false): array
     {
-        $this->validateParams(['username'], ['username']);
-        
-        return $this->executeScript($this->getScriptPath('user', 'add_user'), [
+        $params = [
             'username' => $username,
-            'with_sudo' => $withSudo
-        ]);
+            'with_sudo' => $withSudo,
+        ];
+
+        $this->validateParams($params, ['username']);
+
+        return $this->executeScript($this->getScriptPath('user', 'add_user'), $params);
     }
 }

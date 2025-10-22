@@ -13,11 +13,13 @@ class DeployArtifactService extends BaseServerBondService
      */
     public function execute(string $domain, string $artifact): array
     {
-        $this->validateParams(['domain', 'artifact'], ['domain', 'artifact']);
-        
-        return $this->executeScript($this->getScriptPath('static', 'deploy_artifact'), [
+        $params = [
             'domain' => $domain,
-            'artifact' => $artifact
-        ]);
+            'artifact' => $artifact,
+        ];
+
+        $this->validateParams($params, ['domain', 'artifact']);
+
+        return $this->executeScript($this->getScriptPath('static', 'deploy_artifact'), $params);
     }
 }

@@ -13,12 +13,14 @@ class EnableSslService extends BaseServerBondService
      */
     public function execute(string $domain, string $email, bool $redirectHttps = true): array
     {
-        $this->validateParams(['domain', 'email'], ['domain', 'email']);
-        
-        return $this->executeScript($this->getScriptPath('nginx', 'enable_ssl'), [
+        $params = [
             'domain' => $domain,
             'email' => $email,
-            'redirect_https' => $redirectHttps
-        ]);
+            'redirect_https' => $redirectHttps,
+        ];
+
+        $this->validateParams($params, ['domain', 'email']);
+
+        return $this->executeScript($this->getScriptPath('nginx', 'enable_ssl'), $params);
     }
 }

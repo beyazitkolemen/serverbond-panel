@@ -13,11 +13,19 @@ class EnvWriteService extends BaseServerBondService
      */
     public function execute(string $project, array $envJson): array
     {
-        $this->validateParams(['project', 'env_json'], ['project', 'env_json']);
-        
-        return $this->executeScript($this->getScriptPath('laravel', 'env_write'), [
+        $encodedEnv = json_encode($envJson);
+
+        if ($encodedEnv === false) {
+            throw new \RuntimeException('Failed to encode environment variables to JSON');
+        }
+
+        $params = [
             'project' => $project,
-            'env_json' => json_encode($envJson)
-        ]);
+            'env_json' => $encodedEnv,
+        ];
+
+        $this->validateParams($params, ['project', 'env_json']);
+
+        return $this->executeScript($this->getScriptPath('laravel', 'env_write'), $params);
     }
 }

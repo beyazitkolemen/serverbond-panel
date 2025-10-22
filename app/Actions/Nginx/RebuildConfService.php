@@ -13,11 +13,13 @@ class RebuildConfService extends BaseServerBondService
      */
     public function execute(string $domain, string $type): array
     {
-        $this->validateParams(['domain', 'type'], ['domain', 'type']);
-        
-        return $this->executeScript($this->getScriptPath('nginx', 'rebuild_conf'), [
+        $params = [
             'domain' => $domain,
-            'type' => $type
-        ]);
+            'type' => $type,
+        ];
+
+        $this->validateParams($params, ['domain', 'type']);
+
+        return $this->executeScript($this->getScriptPath('nginx', 'rebuild_conf'), $params);
     }
 }

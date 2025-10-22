@@ -13,11 +13,13 @@ class RestoreDbService extends BaseServerBondService
      */
     public function execute(string $database, string $src): array
     {
-        $this->validateParams(['database', 'src'], ['database', 'src']);
-        
-        return $this->executeScript($this->getScriptPath('maintenance', 'restore_db'), [
+        $params = [
             'database' => $database,
-            'src' => $src
-        ]);
+            'src' => $src,
+        ];
+
+        $this->validateParams($params, ['database', 'src']);
+
+        return $this->executeScript($this->getScriptPath('maintenance', 'restore_db'), $params);
     }
 }

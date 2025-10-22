@@ -19,13 +19,13 @@ class AddSiteService extends BaseServerBondService
         ?int $upstreamPort = null,
         ?string $serverAlias = null
     ): array {
-        $this->validateParams(['domain', 'type', 'root'], ['domain', 'type', 'root']);
-        
         $params = [
             'domain' => $domain,
             'type' => $type,
-            'root' => $root
+            'root' => $root,
         ];
+
+        $this->validateParams($params, ['domain', 'type', 'root']);
 
         if ($phpVersion) {
             $params['php_version'] = $phpVersion;
