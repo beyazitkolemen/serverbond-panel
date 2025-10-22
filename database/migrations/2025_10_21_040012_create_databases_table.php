@@ -16,7 +16,7 @@ return new class extends Migration
             $table->string('charset')->default('utf8mb4');
             $table->string('collation')->default('utf8mb4_unicode_ci');
             $table->integer('max_connections')->default(100);
-            $table->foreignId('site_id')->nullable()->constrained('sites')->onDelete('set null');
+            $table->unsignedBigInteger('site_id')->nullable();
             $table->text('notes')->nullable();
             $table->timestamps();
         });

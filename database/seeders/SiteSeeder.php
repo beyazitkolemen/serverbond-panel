@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Site;
 use App\Enums\SiteType;
+use App\Models\Database;
 use App\Enums\PHPVersion;
 use App\Services\AppService;
 use Illuminate\Database\Seeder;
@@ -11,7 +12,9 @@ use Illuminate\Database\Seeder;
 class SiteSeeder extends Seeder
 {
     public function run(): void
-    {
+    {        Database::truncate();
+
+        Site::truncate();
         $sites = [
             [
                 'name' => 'Laravel Blog',
@@ -32,6 +35,7 @@ class SiteSeeder extends Seeder
             ]);
             $appService = new AppService();
             $appService->createApp($site);
+            dd($appService);
         }
     }
 }

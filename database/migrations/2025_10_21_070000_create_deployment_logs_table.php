@@ -10,8 +10,8 @@ return new class extends Migration
     {
         Schema::create('deployment_logs', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('deployment_id')->nullable()->constrained()->onDelete('cascade');
-            $table->foreignId('site_id')->constrained()->onDelete('cascade');
+            $table->unsignedBigInteger('deployment_id')->nullable();
+            $table->unsignedBigInteger('site_id');
             $table->string('level', 20)->default('info'); // info, warning, error, success
             $table->text('message');
             $table->json('context')->nullable();
