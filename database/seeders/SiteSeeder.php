@@ -23,8 +23,9 @@ class SiteSeeder extends Seeder
             'php_version' => PHPVersion::PHP84->value,
             'root_directory' => '/var/www/blog.example.com',
         ]);
+        $find = Site::where('domain', 'blog.example.com')->first();
 
         $appService = new AppService();
-        $appService->createApp($site);
+        $appService->createApp($find);
     }
 }
