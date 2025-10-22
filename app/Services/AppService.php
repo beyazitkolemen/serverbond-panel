@@ -30,7 +30,7 @@ class AppService
 
         // Create Nginx Site
         $addSiteService = new AddSiteService();
-        $addSiteService->execute($site->domain, $site->type->value, $site->root_directory, $site->php_version->value);
+        $addSiteService->execute($site->domain, $site->root_directory);
 
         $databaseCredentials = $this->generateDatabaseCredentials($site);
         // Create Database
