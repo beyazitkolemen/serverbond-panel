@@ -21,15 +21,7 @@ class NewSiteService extends BaseServerBondService
         string $adminEmail,
         string $title
     ): array {
-        $this->validateParams([
-            'domain', 'db_name', 'db_user', 'db_pass',
-            'admin_user', 'admin_pass', 'admin_email', 'title'
-        ], [
-            'domain', 'db_name', 'db_user', 'db_pass',
-            'admin_user', 'admin_pass', 'admin_email', 'title'
-        ]);
-        
-        return $this->executeScript($this->getScriptPath('wp', 'new_site'), [
+        $params = [
             'domain' => $domain,
             'db_name' => $dbName,
             'db_user' => $dbUser,
@@ -37,7 +29,14 @@ class NewSiteService extends BaseServerBondService
             'admin_user' => $adminUser,
             'admin_pass' => $adminPass,
             'admin_email' => $adminEmail,
-            'title' => $title
+            'title' => $title,
+        ];
+
+        $this->validateParams($params, [
+            'domain', 'db_name', 'db_user', 'db_pass',
+            'admin_user', 'admin_pass', 'admin_email', 'title',
         ]);
+
+        return $this->executeScript($this->getScriptPath('wp', 'new_site'), $params);
     }
 }

@@ -13,11 +13,13 @@ class GitPullService extends BaseServerBondService
      */
     public function execute(string $cwd, string $branch = 'main'): array
     {
-        $this->validateParams(['cwd'], ['cwd']);
-        
-        return $this->executeScript($this->getScriptPath('deploy', 'git_pull'), [
+        $params = [
             'cwd' => $cwd,
-            'branch' => $branch
-        ]);
+            'branch' => $branch,
+        ];
+
+        $this->validateParams($params, ['cwd']);
+
+        return $this->executeScript($this->getScriptPath('deploy', 'git_pull'), $params);
     }
 }

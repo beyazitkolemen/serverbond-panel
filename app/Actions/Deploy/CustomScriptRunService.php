@@ -13,10 +13,12 @@ class CustomScriptRunService extends BaseServerBondService
      */
     public function execute(string $project): array
     {
-        $this->validateParams(['project'], ['project']);
-        
-        return $this->executeScript($this->getScriptPath('deploy', 'custom_script_run'), [
-            'project' => $project
-        ]);
+        $params = [
+            'project' => $project,
+        ];
+
+        $this->validateParams($params, ['project']);
+
+        return $this->executeScript($this->getScriptPath('deploy', 'custom_script_run'), $params);
     }
 }

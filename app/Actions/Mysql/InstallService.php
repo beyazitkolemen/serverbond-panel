@@ -13,10 +13,12 @@ class InstallService extends BaseServerBondService
      */
     public function execute(string $rootPassword): array
     {
-        $this->validateParams(['root_password'], ['root_password']);
-        
-        return $this->executeScript($this->getScriptPath('mysql', 'install'), [
-            'root_password' => $rootPassword
-        ]);
+        $params = [
+            'root_password' => $rootPassword,
+        ];
+
+        $this->validateParams($params, ['root_password']);
+
+        return $this->executeScript($this->getScriptPath('mysql', 'install'), $params);
     }
 }

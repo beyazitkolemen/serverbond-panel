@@ -13,10 +13,12 @@ class UseVersionService extends BaseServerBondService
      */
     public function execute(string $version): array
     {
-        $this->validateParams(['version'], ['version']);
-        
-        return $this->executeScript($this->getScriptPath('node', 'use_version'), [
-            'version' => $version
-        ]);
+        $params = [
+            'version' => $version,
+        ];
+
+        $this->validateParams($params, ['version']);
+
+        return $this->executeScript($this->getScriptPath('node', 'use_version'), $params);
     }
 }

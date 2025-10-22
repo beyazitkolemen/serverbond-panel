@@ -13,11 +13,13 @@ class CreateSslService extends BaseServerBondService
      */
     public function execute(string $domain, string $email): array
     {
-        $this->validateParams(['domain', 'email'], ['domain', 'email']);
-        
-        return $this->executeScript($this->getScriptPath('ssl', 'create_ssl'), [
+        $params = [
             'domain' => $domain,
-            'email' => $email
-        ]);
+            'email' => $email,
+        ];
+
+        $this->validateParams($params, ['domain', 'email']);
+
+        return $this->executeScript($this->getScriptPath('ssl', 'create_ssl'), $params);
     }
 }

@@ -13,10 +13,12 @@ class DeleteDatabaseService extends BaseServerBondService
      */
     public function execute(string $name): array
     {
-        $this->validateParams(['name'], ['name']);
-        
-        return $this->executeScript($this->getScriptPath('mysql', 'delete_database'), [
-            'name' => $name
-        ]);
+        $params = [
+            'name' => $name,
+        ];
+
+        $this->validateParams($params, ['name']);
+
+        return $this->executeScript($this->getScriptPath('mysql', 'delete_database'), $params);
     }
 }

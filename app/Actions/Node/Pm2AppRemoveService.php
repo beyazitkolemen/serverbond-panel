@@ -13,10 +13,12 @@ class Pm2AppRemoveService extends BaseServerBondService
      */
     public function execute(string $name): array
     {
-        $this->validateParams(['name'], ['name']);
-        
-        return $this->executeScript($this->getScriptPath('node', 'pm2_app_remove'), [
-            'name' => $name
-        ]);
+        $params = [
+            'name' => $name,
+        ];
+
+        $this->validateParams($params, ['name']);
+
+        return $this->executeScript($this->getScriptPath('node', 'pm2_app_remove'), $params);
     }
 }

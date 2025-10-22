@@ -13,11 +13,13 @@ class DeployPipelineService extends BaseServerBondService
      */
     public function execute(string $project, bool $runBuild = true): array
     {
-        $this->validateParams(['project'], ['project']);
-        
-        return $this->executeScript($this->getScriptPath('laravel', 'deploy_pipeline'), [
+        $params = [
             'project' => $project,
-            'run_build' => $runBuild
-        ]);
+            'run_build' => $runBuild,
+        ];
+
+        $this->validateParams($params, ['project']);
+
+        return $this->executeScript($this->getScriptPath('laravel', 'deploy_pipeline'), $params);
     }
 }

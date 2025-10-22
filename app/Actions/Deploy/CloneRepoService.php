@@ -11,14 +11,16 @@ class CloneRepoService extends BaseServerBondService
     /**
      * Initial repo clone
      */
-    public function execute(string $repo, string $branch = 'main', string $dest): array
+    public function execute(string $repo, string $dest, string $branch = 'main'): array
     {
-        $this->validateParams(['repo', 'dest'], ['repo', 'dest']);
-        
-        return $this->executeScript($this->getScriptPath('deploy', 'clone_repo'), [
+        $params = [
             'repo' => $repo,
+            'dest' => $dest,
             'branch' => $branch,
-            'dest' => $dest
-        ]);
+        ];
+
+        $this->validateParams($params, ['repo', 'dest']);
+
+        return $this->executeScript($this->getScriptPath('deploy', 'clone_repo'), $params);
     }
 }

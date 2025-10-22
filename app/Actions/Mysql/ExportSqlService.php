@@ -13,11 +13,13 @@ class ExportSqlService extends BaseServerBondService
      */
     public function execute(string $database, string $file): array
     {
-        $this->validateParams(['database', 'file'], ['database', 'file']);
-        
-        return $this->executeScript($this->getScriptPath('mysql', 'export_sql'), [
+        $params = [
             'database' => $database,
-            'file' => $file
-        ]);
+            'file' => $file,
+        ];
+
+        $this->validateParams($params, ['database', 'file']);
+
+        return $this->executeScript($this->getScriptPath('mysql', 'export_sql'), $params);
     }
 }

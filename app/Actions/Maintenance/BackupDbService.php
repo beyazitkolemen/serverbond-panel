@@ -13,11 +13,13 @@ class BackupDbService extends BaseServerBondService
      */
     public function execute(string $database, string $dest): array
     {
-        $this->validateParams(['database', 'dest'], ['database', 'dest']);
-        
-        return $this->executeScript($this->getScriptPath('maintenance', 'backup_db'), [
+        $params = [
             'database' => $database,
-            'dest' => $dest
-        ]);
+            'dest' => $dest,
+        ];
+
+        $this->validateParams($params, ['database', 'dest']);
+
+        return $this->executeScript($this->getScriptPath('maintenance', 'backup_db'), $params);
     }
 }

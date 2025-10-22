@@ -16,12 +16,14 @@ class CreateDatabaseService extends BaseServerBondService
         string $charset = 'utf8mb4',
         string $collation = 'utf8mb4_unicode_ci'
     ): array {
-        $this->validateParams(['name'], ['name']);
-        
-        return $this->executeScript($this->getScriptPath('mysql', 'create_database'), [
+        $params = [
             'name' => $name,
             'charset' => $charset,
-            'collation' => $collation
-        ]);
+            'collation' => $collation,
+        ];
+
+        $this->validateParams($params, ['name']);
+
+        return $this->executeScript($this->getScriptPath('mysql', 'create_database'), $params);
     }
 }

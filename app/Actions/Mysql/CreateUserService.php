@@ -18,14 +18,14 @@ class CreateUserService extends BaseServerBondService
         ?string $database = null,
         string $privileges = 'ALL PRIVILEGES'
     ): array {
-        $this->validateParams(['username', 'password'], ['username', 'password']);
-        
         $params = [
             'username' => $username,
             'password' => $password,
             'host' => $host,
-            'privileges' => $privileges
+            'privileges' => $privileges,
         ];
+
+        $this->validateParams($params, ['username', 'password']);
 
         if ($database) {
             $params['database'] = $database;

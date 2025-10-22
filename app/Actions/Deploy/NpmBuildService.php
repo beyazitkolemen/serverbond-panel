@@ -13,11 +13,13 @@ class NpmBuildService extends BaseServerBondService
      */
     public function execute(string $cwd, string $cmd = 'build'): array
     {
-        $this->validateParams(['cwd'], ['cwd']);
-        
-        return $this->executeScript($this->getScriptPath('deploy', 'npm_build'), [
+        $params = [
             'cwd' => $cwd,
-            'cmd' => $cmd
-        ]);
+            'cmd' => $cmd,
+        ];
+
+        $this->validateParams($params, ['cwd']);
+
+        return $this->executeScript($this->getScriptPath('deploy', 'npm_build'), $params);
     }
 }

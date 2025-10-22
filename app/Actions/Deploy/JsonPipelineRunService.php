@@ -13,13 +13,19 @@ class JsonPipelineRunService extends BaseServerBondService
      */
     public function execute(array $stepsJson, ?string $cwd = null): array
     {
-        $this->validateParams(['steps_json'], ['steps_json']);
-        
+        $encodedSteps = json_encode($stepsJson);
+
+        if ($encodedSteps === false) {
+            throw new \RuntimeException('Failed to encode deployment steps to JSON');
+        }
+
         $params = [
-            'steps_json' => json_encode($stepsJson)
+            'steps_json' => $encodedSteps,
         ];
 
-        if ($cwd) {
+        $this->validateParams($params, ['steps_json']);
+
+        if ($cwd !== null) {
             $params['cwd'] = $cwd;
         }
 

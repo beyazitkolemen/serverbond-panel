@@ -13,10 +13,12 @@ class ComposerInstallService extends BaseServerBondService
      */
     public function execute(string $cwd): array
     {
-        $this->validateParams(['cwd'], ['cwd']);
-        
-        return $this->executeScript($this->getScriptPath('deploy', 'composer_install'), [
-            'cwd' => $cwd
-        ]);
+        $params = [
+            'cwd' => $cwd,
+        ];
+
+        $this->validateParams($params, ['cwd']);
+
+        return $this->executeScript($this->getScriptPath('deploy', 'composer_install'), $params);
     }
 }

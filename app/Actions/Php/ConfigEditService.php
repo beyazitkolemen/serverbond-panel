@@ -13,12 +13,14 @@ class ConfigEditService extends BaseServerBondService
      */
     public function execute(string $key, string $value, string $version = '8.3'): array
     {
-        $this->validateParams(['key', 'value'], ['key', 'value']);
-        
-        return $this->executeScript($this->getScriptPath('php', 'config_edit'), [
+        $params = [
             'version' => $version,
             'key' => $key,
-            'value' => $value
-        ]);
+            'value' => $value,
+        ];
+
+        $this->validateParams($params, ['key', 'value']);
+
+        return $this->executeScript($this->getScriptPath('php', 'config_edit'), $params);
     }
 }

@@ -13,11 +13,13 @@ class ArtisanService extends BaseServerBondService
      */
     public function execute(string $project, string $cmd): array
     {
-        $this->validateParams(['project', 'cmd'], ['project', 'cmd']);
-        
-        return $this->executeScript($this->getScriptPath('laravel', 'artisan'), [
+        $params = [
             'project' => $project,
-            'cmd' => $cmd
-        ]);
+            'cmd' => $cmd,
+        ];
+
+        $this->validateParams($params, ['project', 'cmd']);
+
+        return $this->executeScript($this->getScriptPath('laravel', 'artisan'), $params);
     }
 }
